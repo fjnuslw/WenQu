@@ -4,7 +4,7 @@
 |---|---|
 | 版本 | v0.3（K1 知识冷启动完成态） |
 | 日期 | 2026-08-29 |
-| 状态 | **K1 已完成**：全源导入管道实测跑通、题库持续增长、厂商分类管道上线、算法题（LeetCode Hot100）接入；下一阶段 I1 面试循环 |
+| 状态 | **K1 已完成 + I1 闭环打通**：题库 2 万+（track/厂商/标签三维组织）、组卷→题单驱动面试→评分报告端到端实测；I1 剩余：简历押题/报告页/失分点回流 |
 | 配套调研 | [research/01-竞品调研](../research/01-竞品调研.md) · [02-数据渠道](../research/02-开源面经题库与数据渠道.md) · [03-harness技术](../research/03-agent-harness与项目拷打技术.md) · [04-简历画像](../research/04-简历画像与考点映射.md) · [05-功能补充](../research/05-功能补充与差异化结论.md) |
 
 **决策记录**：
@@ -201,7 +201,7 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 |---|---|---|---|
 | **P0 基座** | 三服务脚手架、docker-compose、核心数据模型+Alembic、LLM 网关、设计令牌与 UI 壳、pi 运行时接入、一键启停脚本 | api 启动建表；agents 可开 session 对话；web 壳可导航 | ✅ 2026-08-28（全栈实测：stop/start 幂等循环、健康检查、pi 集成 tsc 零错误） |
 | **K1 知识核心** | F1 导入器（11 源注册+license 门禁）+ 增量导入（source_files 收敛记账）+ LLM 结构化抽取（思考开关/大 max_tokens）+ Meili 索引与全文检索 + F2 题库查询/标签/公司筛选 + **厂商分类管道**（24 厂商种子 + AI 推断标注 + 词表硬校验）+ **算法题接入**（kind=algorithm + "算法"标签族 + LeetCode Hot100 种子，供 I1 面试现场手撕调用） | 题库 ≥3000、面经 ≥500（§3 表格）；导入幂等可增量重跑 | ✅ 2026-08-29 管道全线打通并实测（faq-of-llm-interview 首源 128 文件；其余源经 `scripts/import_source.py --all` 后台持续灌库；厂商标注 AI 推断 freq=1，待面经挖掘校准） |
-| **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官可从 kind=algorithm 抽题现场手撕** | 30 分钟模拟面试+报告达 §4 验收 | 未开始（当前阶段） |
+| **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官从题库组卷（含 kind=algorithm 手撕抽题）** | 30 分钟模拟面试+报告达 §4 验收 | 🟡 进行中（**闭环已打通**）：组卷 `POST /api/interview/plan`（公司频率榜+track 筛选，50ms）→ agents **题单驱动模式**（队列出题/含糊追问/打满跳题/question 进度事件，5 轮实测 0.8-1.3s/轮）→ 评分报告端到端实测（rubric 五维+原话证据+带标签复习建议）。待做：简历解析押题、报告页 UI、失分点回流 SM-2 |
 | **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | 未开始 |
 | **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | 未开始 |
 | **P1 公开化** | 多用户、UGC 爆料、语音（LiveKit）、岗位聚合评估 | 按 §10 合规重审 | 未开始 |
@@ -217,6 +217,11 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **题库页体验补齐**：`GET /api/questions/stats` 输出 track/kind/tag facet 计数；前端分页器（页码窗口+每页 20/50/100）、岗位大类与题型徽章带数量、"未分类 N（回填中）"诚实计数。商汤 logo 追加。
 - **2026-08-29 续**：① 厂商 logo 补齐至 **21/25**（新增 DeepSeek/华为/蚂蚁/智谱/讯飞/月之暗面，商汤换高清版；缺 MiniMax/阶跃星辰/拼多多/小米 待素材）；② **track 增加"视觉算法"**（CV/CNN/ViT/多模态），存量 track 全量重置重判；③ 标签归一（tag_vocab 规范词表 + 别名表 + normalize_tags 脚本，修复小写漂移导致的 RAG/Agent 筛选零命中）；④ 题库页搜索置顶、厂商瓷片加大、标签 chips 由真实计数驱动；⑤ 配置/data 目录全部锚定仓库根（cwd 无关）， agents 会话目录与 api 对齐，导演回声泄漏做确定性清理。
 - **2026-08-29 续二（同源代理架构，根治题库页 Failed to fetch）**：浏览器跨端口直连后端在真实浏览器环境（系统代理/端口漂移叠加）下不可靠。改为 **Next.js rewrites 同源代理**：`/api/*`→api、`/agents/*`→agents，前端只与 web 端口通信（SSE 流式经代理实测可用）；`start.ps1` 每次启动把实际解析端口写入 `.env.local`（API_PROXY_TARGET/AGENTS_PROXY_TARGET）并新增**启动前端口清障守卫**（本项目进程占用目标端口即清理——Next16 dev 单实例锁会让新实例静默退出，是多次"重启无效"的元凶）。仓库已推送：github.com/fjnuslw/WenQu（git 代理配置 127.0.0.1:7897）。
+- **2026-08-29 续三（性能优化 + I1 闭环打通）**：
+  - **性能**：调研与决策记录见 `search/前端性能优化调研.md`——页面切换卡的主因是 dev 模式按需编译，**默认切生产模式**（next build+start，start.ps1 自动构建，`-Dev` 保留开发模式），实测页面 22ms、代理 API 45ms；筛选卡的主因是无防抖+清屏闪烁，落地 **300ms 防抖 + keepPreviousData 等价实现**（拉取期间旧列表置灰），路由级 loading.tsx 兜底。
+  - **端口策略定稿**：固定冷门段 23480-23482/24432/27700/26379；启动前项目级进程清障（按命令行清理孤儿 tsx/uvicorn）+ 端口清障 + 外部占用显式失败（不做自动漂移——漂移曾导致代理目标写坏与双实例并存）。
+  - **同源代理定稿**：`/api/*` 走 rewrites；`/agents/*` 走专用 Route Handler（node:http + keepAlive:false——undici 连接池在 SSE 流结束后复用会被上游判 400，成功/失败交替出现）。
+  - **I1 闭环实测**：组卷 50ms → 题单驱动面试 5 轮（0.8-1.3s/轮）→ 评分报告准确识别答非所问并给出带标签复习建议。
 - **I1 开工（第一块：评分报告）**：`POST/GET /api/sessions/{id}/report`——读取 agents 会话 JSONL → LLM 多维 rubric（理解深度/设计决策/表达结构/诚实度，带原话证据）→ 评分+失分点+带标签的复习建议 → 持久化 interview_sessions.score。端到端实测通过（真实会话两轮 → 报告质量达标）。失分点回流 SM-2（F6）据此推进。
 
 ## 10. 合规与 License 策略
