@@ -8,6 +8,8 @@ export interface AgentServiceConfig {
   dataDir: string;
   apiBaseUrl: string;
   defaultModel: string;
+  /** 思考档位（pi-agent-core AgentState.thinkingLevel；"max" 为最强推理，用户显式要求） */
+  thinkingLevel: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   /** DEEPSEEK_API_KEY 是否已配置；未配置时 /sessions 返回 503（显式而非运行中途炸裂） */
   hasApiKey: boolean;
 }
@@ -39,6 +41,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentServiceCo
     dataDir: env.AGENT_DATA_DIR ?? "../../data/sessions",
     apiBaseUrl: env.API_BASE_URL ?? "http://127.0.0.1:23480",
     defaultModel: env.AGENT_MODEL ?? "deepseek-v4-flash-vision-exp",
+    thinkingLevel: parseThinkingLevel(env.AGENT_THINKING_LEVEL ?? "max"),
     hasApiKey: apiKey.length > 0,
   };
+}
+
+/** 词表校验：非法值显式失败而非静默回退（spec §7）。 */
+function parseThinkingLevel(value: string): AgentServiceConfig["thinkingLevel"] {
+  const levels = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+  const match = levels.find((candidate) => candidate === value);
+  if (match === undefined) {
+    throw new Error(`AGENT_THINKING_LEVEL 非法: ${value}（合法值: ${levels.join("/")}）`);
+  }
+  return match;
 }

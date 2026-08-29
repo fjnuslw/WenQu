@@ -50,6 +50,8 @@ export interface PhaseState {
 
 export interface TurnOutcome {
   reply: string;
+  /** 本轮思考流全文（thinkingLevel 开启时），供日志与 UI 复盘 */
+  thinking: string;
   phase: Phase;
   followUpDepth: number;
   phaseAdvanced: boolean;
@@ -58,6 +60,7 @@ export interface TurnOutcome {
 /** SSE 事件协议（web 消费）。 */
 export type ClientEvent =
   | { type: "text_delta"; delta: string }
+  | { type: "thinking_delta"; delta: string }
   | { type: "phase"; phase: Phase }
   | { type: "followup"; level: number }
   | { type: "question"; index: number; total: number; stem: string; kind: string }

@@ -31,10 +31,12 @@ export async function webSearch(query: string): Promise<WebSearchResult[]> {
     const anchor = $(element).find("h2 a").first();
     const title = anchor.text().trim();
     const url = anchor.attr("href") ?? "";
-    const snippet = $(element).find(".b_caption p, .b_lineclamp2, .b_lineclamp3").first().text().trim();
+    // 摘要截断：控制工具结果体积，避免搜索噪声膨胀上下文（token 开销）
+    const rawSnippet = $(element).find(".b_caption p, .b_lineclamp2, .b_lineclamp3").first().text().trim();
+    const snippet = rawSnippet.length > 280 ? `${rawSnippet.slice(0, 280)}…` : rawSnippet;
     if (title && url) results.push({ title, url, snippet });
   });
-  return results.slice(0, 6);
+  return results.slice(0, 5);
 }
 
 interface WebSearchArgs {

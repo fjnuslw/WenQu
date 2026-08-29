@@ -54,7 +54,8 @@ function buildDeepSeekProvider(): Provider<"openai-completions"> {
 }
 
 export interface PiRuntime {
-  agentFactory: (systemPrompt: string, tools?: AgentTool[]) => Agent;
+  /** thinkingLevel 缺省用全局配置；可按会话模式降档（面试官短回复不需要 max 思考的开销） */
+  agentFactory: (systemPrompt: string, tools?: AgentTool[], thinkingLevel?: AgentServiceConfig["thinkingLevel"]) => Agent;
 }
 
 export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
@@ -64,10 +65,18 @@ export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
   if (!model) {
     throw new Error(`pi-ai 目录中不存在: deepseek/${config.defaultModel}`);
   }
+  if (!model.reasoning) {
+    throw new Error(`模型 ${model.id} 目录条目未标记 reasoning，无法开启思考流（显式失败而非静默降级）`);
+  }
   return {
-    agentFactory: (systemPrompt: string, tools?: AgentTool[]) =>
+    agentFactory: (systemPrompt, tools, thinkingLevel) =>
       new Agent({
-        initialState: tools ? { systemPrompt, model, tools } : { systemPrompt, model },
+        initialState: {
+          systemPrompt,
+          model,
+          thinkingLevel: thinkingLevel ?? config.thinkingLevel,
+          ...(tools ? { tools } : {}),
+        },
         streamFn: models.streamSimple.bind(models),
       }),
   };

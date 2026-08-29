@@ -29,6 +29,8 @@ interface RunningSession {
   qIndex: number;
   /** 本轮流式增量累积（assistant 原文的第一数据源） */
   streamBuf: string;
+  /** 本轮思考流累积（thinkingLevel 开启时的 reasoning_content 增量） */
+  thinkBuf: string;
   /** 当前轮次的 SSE 下沉点（turn 期间有效） */
   sink: ((event: ClientEvent) => void) | null;
   logPath: string;
@@ -107,9 +109,13 @@ export class SessionManager {
     const id = randomUUID();
     await mkdir(this.config.dataDir, { recursive: true });
     const logPath = path.join(this.config.dataDir, `${id}.jsonl`);
+    // 思考档位按模式分档：答题（mode=answer）吃满全局档（max）——深度推理是产品特性；
+    // 面试官短回复用 medium 即可，省下 reasoning token 开销。
+    const thinkingLevel = config.mode === "answer" ? this.config.thinkingLevel : "medium";
     const agent = this.runtime.agentFactory(
       systemPrompt(config),
       config.mode === "answer" ? [webSearchTool] : undefined,
+      thinkingLevel,
     );
     const questions = config.questions ?? [];
     const session: RunningSession = {
@@ -122,6 +128,7 @@ export class SessionManager {
       questions,
       qIndex: 0,
       streamBuf: "",
+      thinkBuf: "",
     };
     agent.subscribe((event: unknown) => this.onAgentEvent(session, event));
     this.sessions.set(id, session);
@@ -213,37 +220,56 @@ export class SessionManager {
     const prompt = `${directives.join("\n")}\n\n候选人发言：${input.text}`;
     await this.appendLog(session, { type: "user", text: input.text, directives });
     session.streamBuf = ""; // 新一轮清空流式累积
+    session.thinkBuf = "";
     await session.agent.prompt(prompt);
 
+    const thinking = session.thinkBuf.trim();
     const outcome: TurnOutcome = {
       reply: stripEchoedDirective(this.lastAssistantText(session)),
+      thinking,
       phase: session.state.phase,
       followUpDepth: session.state.followUpDepth,
       phaseAdvanced,
     };
-    await this.appendLog(session, { type: "assistant", text: outcome.reply, state: session.state });
+    // token 开销与缓存命中可观测（DeepSeek: cacheRead≈prompt_cache_hit_tokens）
+    await this.appendLog(session, {
+      type: "assistant",
+      text: outcome.reply,
+      thinking,
+      usage: this.lastAssistantUsage(session),
+      state: session.state,
+    });
     session.sink = null;
     return outcome;
   }
 
   private onAgentEvent(session: RunningSession, event: unknown): void {
     if (!event || typeof event !== "object") return;
-    const typed = event as { type?: string; assistantMessageEvent?: { type?: string; delta?: string } };
-    if (typed.type === "message_update" && typed.assistantMessageEvent?.type === "text_delta") {
-      const delta = typed.assistantMessageEvent.delta ?? "";
-      if (delta) {
-        session.streamBuf += delta; // 累积为 assistant 原文（主数据源）
-        session.sink?.({ type: "text_delta", delta });
-      }
+    const typed = event as {
+      type?: string;
+      assistantMessageEvent?: { type?: string; delta?: string };
+    };
+    if (typed.type !== "message_update") return;
+    const messageEvent = typed.assistantMessageEvent;
+    if (!messageEvent) return;
+    if (messageEvent.type === "text_delta" && messageEvent.delta) {
+      const delta = messageEvent.delta;
+      session.streamBuf += delta; // 累积为 assistant 原文（主数据源）
+      session.sink?.({ type: "text_delta", delta });
+    }
+    if (messageEvent.type === "thinking_delta" && messageEvent.delta) {
+      const delta = messageEvent.delta;
+      session.thinkBuf += delta;
+      session.sink?.({ type: "thinking_delta", delta });
     }
   }
 
   private lastAssistantText(session: RunningSession): string {
-    // 首选：流式增量累积（与本轮回声同源、时序无竞态）；messages 扫描作为对账
+    // 首选：流式增量累积（与本轮回声同源、时序无竞态）；agent.state.messages 扫描作为对账
     const streamed = session.streamBuf.trim();
     if (streamed) return streamed;
-    const agent = session.agent as unknown as { messages?: unknown[] };
-    const messages = agent.messages ?? [];
+    const agent = session.agent as unknown as { state?: { messages?: unknown[] } };
+    const messages = agent.state?.messages ?? [];
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index] as { role?: string } | null;
       if (message?.role === "assistant") {
@@ -252,6 +278,30 @@ export class SessionManager {
       }
     }
     throw new Error("本轮未收到 assistant 文本（pi 事件流异常），显式失败而非空回复兜底");
+  }
+
+  private lastAssistantUsage(session: RunningSession): Record<string, number> | null {
+    // pi Agent 的消息数组经 agent.state.messages 访问（agent.messages 不存在——
+    // 正文提取一直由 streamBuf 主路径承担，此处是它的首个真实消费方）
+    const agent = session.agent as unknown as { state?: { messages?: unknown[] } };
+    const messages = agent.state?.messages ?? [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index] as { role?: string; usage?: Record<string, unknown> | null } | null;
+      if (message?.role === "assistant") {
+        const usage = message.usage;
+        if (!usage) return null;
+        const pick = (key: string): number => (typeof usage[key] === "number" ? (usage[key] as number) : 0);
+        const recorded: Record<string, number> = {
+          input: pick("input"),
+          output: pick("output"),
+          cacheRead: pick("cacheRead"),
+          cacheWrite: pick("cacheWrite"),
+        };
+        if (typeof usage.reasoning === "number") recorded.reasoning = usage.reasoning;
+        return recorded;
+      }
+    }
+    return null;
   }
 
   private async appendLog(session: RunningSession, entry: Record<string, unknown>): Promise<void> {
