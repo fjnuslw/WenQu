@@ -56,11 +56,17 @@ export const webSearchTool: AgentTool = {
     required: ["query"],
     additionalProperties: false,
   },
-  execute: async (args: WebSearchArgs) => {
-    const results = await webSearch(args.query);
+  // pi-agent-core 的 execute 签名：首参是 toolCallId，第二参才是模型给的参数
+  // （此前误把首参当 args，query 恒为 undefined → 真去搜了 "undefined" 这个词）
+  execute: async (_toolCallId: string, args: WebSearchArgs) => {
+    const query = typeof args?.query === "string" ? args.query.trim() : "";
+    if (!query) {
+      throw new Error("web_search 需要非空的字符串参数 query（搜索关键词）");
+    }
+    const results = await webSearch(query);
     if (results.length === 0) {
       return {
-        content: [{ type: "text", text: `未搜索到与「${args.query}」相关的结果。` }],
+        content: [{ type: "text", text: `未搜索到与「${query}」相关的结果。` }],
         details: { count: 0 },
       };
     }
