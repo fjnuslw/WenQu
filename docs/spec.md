@@ -227,6 +227,11 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **提交者归属**：git 身份切换为 fjnuslw（276824652+fjnuslw@users.noreply.github.com），历史 commit 经 filter-branch 重写并强推。
   - 已知限制：Bing 对 bot 查询偶发返回低质结果（助手会诚实声明），后续可升级 Tavily/博查 API（需 key）。
 - **I1 开工（第一块：评分报告）**：`POST/GET /api/sessions/{id}/report`——读取 agents 会话 JSONL → LLM 多维 rubric（理解深度/设计决策/表达结构/诚实度，带原话证据）→ 评分+失分点+带标签的复习建议 → 持久化 interview_sessions.score。端到端实测通过（真实会话两轮 → 报告质量达标）。失分点回流 SM-2（F6）据此推进。
+- **2026-08-29 续五（问答助手 UI 落地验证 + 陈旧构建自动重建 + 题单状态机修复）**：
+  - **"问助手"按钮不可见的根因与修复**：web 默认生产模式，而 start.ps1 只在 BUILD_ID 缺失时构建——按钮代码晚于上次构建 → 服务的是陈旧产物。新增**源码 mtime vs BUILD_ID 自动重建检测**（apps/web/src、next.config.ts、package.json 任一比产物新即重建），删除"已有产物即跳过"的静默分支。
+  - **UI 美化落地验证**（浏览器实测 /bank 生产构建）：题目卡"问助手"按钮 40 处可见；厂商瓷片放大（logo size-14、字节 1069/阿里 922/腾讯 715/Google 435/DeepSeek 340/微软 334/百度 108）；全局字体栈升级（Inter/Segoe UI Variable/PingFang SC/微软雅黑，tabular-nums、行高 1.65、标题 letter-spacing）；题干 15px。共 22679 题。
+  - **题单驱动模式状态机修复**：追问命中时误入 else 分支直接置 closing（与追问指令矛盾）、队列耗尽时 throw 越界。修正语义：含糊→原题追问不推进队列；有效回答/追问打满→出下一题；**队列耗尽→进入 closing 并在后续轮次稳定维持**（重复播报收尾指令无害）。
+  - 提交：db91173（fix agents）、9c01f41（feat web+脚本），fjnuslw 推送 main。
 
 ## 10. 合规与 License 策略
 
