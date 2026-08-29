@@ -16,13 +16,18 @@ import type { AgentServiceConfig } from "./config.js";
 import type { PiRuntime } from "./pi.js";
 import { initialState, nextPhase, onFollowUp, onQuestionCompleted, shouldAdvance } from "./state-machine.js";
 import { followUpDirective, phaseDirective, systemPrompt } from "./prompts.js";
-import type { ClientEvent, PhaseState, SessionConfig, TurnOutcome } from "./types.js";
+import type { ClientEvent, PhaseState, PlanQuestion, SessionConfig, TurnOutcome } from "./types.js";
 
 interface RunningSession {
   id: string;
   config: SessionConfig;
   agent: Agent;
   state: PhaseState;
+  /** 题单驱动模式：待出题队列与游标 */
+  questions: PlanQuestion[];
+  qIndex: number;
+  /** 本轮流式增量累积（assistant 原文的第一数据源） */
+  streamBuf: string;
   /** 当前轮次的 SSE 下沉点（turn 期间有效） */
   sink: ((event: ClientEvent) => void) | null;
   logPath: string;
@@ -74,6 +79,21 @@ function stripEchoedDirective(text: string): string {
   return firstBreak === -1 ? text : text.slice(firstBreak).trim();
 }
 
+/** 题型 → 展示阶段映射（题单驱动模式）。 */
+function phaseForKind(kind: string): PhaseState["phase"] {
+  if (kind === "scenario") return "scenario";
+  return "knowledge";
+}
+
+function questionDirective(index: number, total: number, q: PlanQuestion): string {
+  const answer = q.answer ?? "（无参考要点，按你的知识判断回答质量）";
+  return [
+    `[导演指令] 现在提出题单第 ${index}/${total} 题。`,
+    `题干：${q.stem}`,
+    `参考答案要点（仅供你判断回答质量与追问方向，切勿直接念给候选人）：${answer}`,
+  ].join("\n");
+}
+
 export class SessionManager {
   private readonly sessions = new Map<string, RunningSession>();
 
@@ -87,7 +107,18 @@ export class SessionManager {
     await mkdir(this.config.dataDir, { recursive: true });
     const logPath = path.join(this.config.dataDir, `${id}.jsonl`);
     const agent = this.runtime.agentFactory(systemPrompt(config));
-    const session: RunningSession = { id, config, agent, state: initialState(), sink: null, logPath };
+    const questions = config.questions ?? [];
+    const session: RunningSession = {
+      id,
+      config,
+      agent,
+      state: initialState(),
+      sink: null,
+      logPath,
+      questions,
+      qIndex: 0,
+      streamBuf: "",
+    };
     agent.subscribe((event: unknown) => this.onAgentEvent(session, event));
     this.sessions.set(id, session);
     await this.appendLog(session, { type: "session_start", config });
@@ -104,40 +135,77 @@ export class SessionManager {
     return { id, ...this.require(id).state };
   }
 
-  /** 处理候选人一轮发言：状态机 → 导演指令 → pi Agent → 落盘。 */
+  /** 处理候选人一轮发言：状态机/题单推进 → 导演指令 → pi Agent → 落盘。 */
   async turn(id: string, input: TurnInput, sink: (event: ClientEvent) => void): Promise<TurnOutcome> {
     const session = this.require(id);
     session.sink = sink;
     sink({ type: "phase", phase: session.state.phase });
 
-    // 1. 依据评审判定推进状态机
-    if (input.vagueAnswer === true) {
-      const advanced = onFollowUp(session.state, session.config);
-      if (advanced) {
-        session.state = advanced;
-        sink({ type: "followup", level: session.state.followUpDepth });
+    const directives: string[] = [];
+    let phaseAdvanced = false;
+
+    if (session.questions.length > 0) {
+      // ---- 题单驱动模式：队列出题，阶段预算不生效 ----
+      // 含糊且追问未打满 → 原题追问（不推进队列）；有效回答或追问打满 → 出下一题
+      let introduceNext = true;
+      if (input.vagueAnswer === true) {
+        const advanced = onFollowUp(session.state, session.config);
+        if (advanced) {
+          session.state = advanced;
+          sink({ type: "followup", level: session.state.followUpDepth });
+          directives.push(followUpDirective(session.state));
+          introduceNext = false;
+        }
+        // 追问打满：该题记盲区，introduceNext 保持 true，下方出下一题
+      }        if (introduceNext) {
+          const q = session.questions[session.qIndex];
+          if (q === undefined) throw new Error("题队列耗尽却尝试出题（状态机越界），显式失败");
+          session.qIndex += 1;
+          session.state = {
+            ...session.state,
+            phase: phaseForKind(q.kind),
+            followUpDepth: 0,
+          };
+          sink({ type: "phase", phase: session.state.phase });
+          sink({
+            type: "question",
+            index: session.qIndex,
+            total: session.questions.length,
+            stem: q.stem,
+            kind: q.kind,
+          });
+          directives.push(questionDirective(session.qIndex, session.questions.length, q));
+        } else {
+          session.state = { ...session.state, phase: "closing", followUpDepth: 0 };
+          sink({ type: "phase", phase: "closing" });
+          directives.push("[导演指令] 题单已全部完成，请做总结收尾，不再提出新问题。");
+        }
+    } else {
+      // ---- 无题单：原状态机 ----
+      if (input.vagueAnswer === true) {
+        const advanced = onFollowUp(session.state, session.config);
+        if (advanced) {
+          session.state = advanced;
+          sink({ type: "followup", level: session.state.followUpDepth });
+          directives.push(followUpDirective(session.state));
+        } else {
+          session.state = onQuestionCompleted(session.state);
+        }
       } else {
-        // 追问链打满：该点记为盲区，按完成一道题处理
         session.state = onQuestionCompleted(session.state);
       }
-    } else {
-      session.state = onQuestionCompleted(session.state);
+      if (shouldAdvance(session.state, session.config)) {
+        const next = nextPhase(session.state.phase);
+        session.state = { ...session.state, phase: next, questionsInPhase: 0, followUpDepth: 0 };
+        phaseAdvanced = true;
+        sink({ type: "phase", phase: next });
+      }
+      directives.push(phaseDirective(session.state, session.config));
     }
 
-    // 2. 阶段预算用尽则切换阶段
-    let phaseAdvanced = false;
-    if (shouldAdvance(session.state, session.config)) {
-      const next = nextPhase(session.state.phase);
-      session.state = { ...session.state, phase: next, questionsInPhase: 0, followUpDepth: 0 };
-      phaseAdvanced = true;
-      sink({ type: "phase", phase: next });
-    }
-
-    // 3. 导演指令 + 候选人发言
-    const directives = [phaseDirective(session.state, session.config)];
-    if (input.vagueAnswer === true) directives.push(followUpDirective(session.state));
     const prompt = `${directives.join("\n")}\n\n候选人发言：${input.text}`;
     await this.appendLog(session, { type: "user", text: input.text, directives });
+    session.streamBuf = ""; // 新一轮清空流式累积
     await session.agent.prompt(prompt);
 
     const outcome: TurnOutcome = {
@@ -156,12 +224,17 @@ export class SessionManager {
     const typed = event as { type?: string; assistantMessageEvent?: { type?: string; delta?: string } };
     if (typed.type === "message_update" && typed.assistantMessageEvent?.type === "text_delta") {
       const delta = typed.assistantMessageEvent.delta ?? "";
-      if (delta) session.sink?.({ type: "text_delta", delta });
+      if (delta) {
+        session.streamBuf += delta; // 累积为 assistant 原文（主数据源）
+        session.sink?.({ type: "text_delta", delta });
+      }
     }
   }
 
   private lastAssistantText(session: RunningSession): string {
-    // pi Agent 的消息数组字段名以 0.84.3 为准；适配收敛在 pi.ts + 此处两处。
+    // 首选：流式增量累积（与本轮回声同源、时序无竞态）；messages 扫描作为对账
+    const streamed = session.streamBuf.trim();
+    if (streamed) return streamed;
     const agent = session.agent as unknown as { messages?: unknown[] };
     const messages = agent.messages ?? [];
     for (let index = messages.length - 1; index >= 0; index -= 1) {

@@ -23,13 +23,23 @@ export interface PersonaConfig {
   resumeHighlights?: string[];
 }
 
+/** 组卷题单中的一道题（来自 api /api/interview/plan）。 */
+export interface PlanQuestion {
+  id: number;
+  stem: string;
+  kind: string;
+  answer: string | null;
+}
+
 export interface SessionConfig {
   mode: SessionMode;
   persona: PersonaConfig;
-  /** 每阶段最多提问数，超过则推进状态机 */
+  /** 每阶段最多提问数，超过则推进状态机（仅无题单模式生效） */
   maxQuestionsPerPhase: number;
   /** 追问链最大深度（4 级提示降级，spec F3） */
   maxFollowUpDepth: number;
+  /** 题单驱动模式：提供后按题单顺序出题，忽略阶段预算 */
+  questions?: PlanQuestion[];
 }
 
 export interface PhaseState {
@@ -50,5 +60,6 @@ export type ClientEvent =
   | { type: "text_delta"; delta: string }
   | { type: "phase"; phase: Phase }
   | { type: "followup"; level: number }
+  | { type: "question"; index: number; total: number; stem: string; kind: string }
   | { type: "final"; outcome: TurnOutcome }
   | { type: "error"; message: string };

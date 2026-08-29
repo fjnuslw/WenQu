@@ -1,8 +1,12 @@
 ﻿# start.ps1 — 一键启动（docker 基础设施 → api → agents → web）
-# 用法：start.bat 双击运行，或 powershell -File scripts\start.ps1 [-NoDocker]
+# 用法：start.bat 双击运行，或 powershell -File scripts\start.ps1 [-NoDocker] [-Dev]
 # 端口策略：默认冷门段，逐一探测占用，冲突自动向上顺延并回写 web/.env.local。
+# 默认 web 走生产模式（next build + next start，路由预编译、切换不卡）；-Dev 保留开发模式。
 
-param([switch]$NoDocker)
+param(
+    [switch]$NoDocker,
+    [switch]$Dev
+)
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
@@ -39,19 +43,30 @@ if (-not (Test-Path (Join-Path $repoRoot "apps\web\node_modules"))) {
 }
 Write-Ok "工具链与依赖就绪"
 
-# ---- 1. 端口解析（探测占用，冲突自动顺延） ----
-Write-Step "端口解析（默认冷门段，冲突自动上移）"
-$taken = New-Object System.Collections.Generic.List[int]
-$apiPort = Find-FreePort $Script:Defaults.ApiPort $taken; $taken.Add($apiPort)
-$agentsPort = Find-FreePort $Script:Defaults.AgentsPort $taken; $taken.Add($agentsPort)
-$webPort = Find-FreePort $Script:Defaults.WebPort $taken; $taken.Add($webPort)
-function Report-Port([string]$Name, [int]$Preferred, [int]$Resolved) {
-    if ($Preferred -eq $Resolved) { Write-Ok "$Name = $Resolved" }
-    else { Write-Warn2 "$Name 首选 $Preferred 被占用，改用 $Resolved" }
-}
+# ---- 1. 端口绑定（固定冷门段；先清本项目残留与孤儿进程，再检测外部占用——不做自动漂移） ----
+Write-Step "端口绑定（固定冷门段，启动前清障）"
+$apiPort = $Script:Defaults.ApiPort
+$agentsPort = $Script:Defaults.AgentsPort
+$webPort = $Script:Defaults.WebPort
 
-# 启动前清障：目标端口若被本项目进程（python/node/cmd/npm）占用则结束之，
-# 防止 Next16 单实例锁 / EADDRINUSE 导致新实例静默退出（多次排障的根因）。
+# 项目级残留清障：命令行指向本项目 apps/* 的残留 node/python 一律结束。
+# （历次重启的孤儿 tsx watch / uvicorn 会造成双实例并存、数据目录错位）
+function Clear-ProjectStrays {
+    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and ($_.CommandLine -like "*get_offer*apps*agents*" -or $_.CommandLine -like "*get_offer*apps*api*" -or $_.CommandLine -like "*get_offer*apps*web*") }
+    foreach ($proc in $procs) {
+        $name = (Get-Process -Id $proc.ProcessId -ErrorAction SilentlyContinue).ProcessName
+        if (@("python", "node", "cmd", "npm", "tsx") -contains $name) {
+            Write-Warn2 "清理残留进程 $name(pid $($proc.ProcessId))"
+            taskkill /PID $proc.ProcessId /T /F | Out-Null
+        }
+    }
+}
+Clear-ProjectStrays
+Start-Sleep -Milliseconds 500
+
+# 端口清障：目标端口若被本项目进程（python/node/cmd/npm）占用则结束之，
+# 防止 Next16 单实例锁 / EADDRINUSE 导致新实例静默退出。
 function Clear-OurPort([int]$Port) {
     $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     foreach ($conn in $conns) {
@@ -60,14 +75,21 @@ function Clear-OurPort([int]$Port) {
         if (@("python", "node", "cmd", "npm") -contains $ownerName) {
             Write-Warn2 "端口 $Port 上残留本项目进程 $ownerName(pid $ownerPid)，先结束"
             taskkill /PID $ownerPid /T /F | Out-Null
-        } elseif ($ownerName) {
-            Write-Fail "端口 $Port 被外部进程 $ownerName(pid $ownerPid) 占用，跳过清理"
         }
     }
 }
-Report-Port "api" $Script:Defaults.ApiPort $apiPort
-Report-Port "agents" $Script:Defaults.AgentsPort $agentsPort
-Report-Port "web" $Script:Defaults.WebPort $webPort
+Clear-OurPort $apiPort; Clear-OurPort $agentsPort; Clear-OurPort $webPort
+
+# 外部占用显式失败（不做自动漂移，避免代理目标漂移）
+foreach ($pair in @(@("api", $apiPort), @("agents", $agentsPort), @("web", $webPort))) {
+    if (Test-PortListening $pair[1]) {
+        $ownerPid = (Get-NetTCPConnection -LocalPort $pair[1] -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
+        $ownerName = if ($ownerPid) { Get-PortOwnerName $ownerPid } else { "unknown" }
+        Write-Fail "端口 $($pair[1]) 被外部进程 $ownerName(pid $ownerPid) 占用——请释放后重试"
+        exit 1
+    }
+}
+Write-Ok "api = $apiPort, agents = $agentsPort, web = $webPort"
 $failures = 0
 
 # ---- 2. 基础设施 ----
@@ -160,19 +182,43 @@ API_PROXY_TARGET=http://127.0.0.1:$apiPort
 AGENTS_PROXY_TARGET=http://127.0.0.1:$agentsPort
 "@ | Set-Content -Path $envLocal -Encoding UTF8
 Write-Ok "已写 apps\web\.env.local（同源代理指向本次解析的 api/agents 端口）"
+
+if (-not $Dev) {
+    # 生产模式：无构建产物时先构建（路由预编译，页面切换不卡；见 search/前端性能优化调研.md）
+    $buildId = Join-Path $repoRoot "apps\web\.next\BUILD_ID"
+    if (-not (Test-Path $buildId)) {
+        Write-Step "生产构建（首次约 1-3 分钟，日志 logs\web-build.log）"
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        Push-Location (Join-Path $repoRoot "apps\web")
+        try {
+            cmd /c "npm run build" *> (Join-Path $logDir "web-build.log")
+            $buildExit = $LASTEXITCODE
+            $ErrorActionPreference = $prevEap
+            if ($buildExit -ne 0) {
+                Write-Fail "next build 失败（详见 logs\web-build.log）"
+                Get-Content (Join-Path $logDir "web-build.log") -Tail 10 | ForEach-Object { Write-Host "    $_" }
+                $failures++
+            } else { Write-Ok "构建完成" }
+        } finally { Pop-Location }
+    } else { Write-Ok "已有构建产物，跳过 build（改动代码后删除 apps\web\.next 可强制重建）" }
+}
+
 $webProcId = Read-ProcId "web"
 if ($null -ne $webProcId -and (Test-ProcAlive $webProcId)) {
     Write-Ok "web 已在运行（pid $webProcId），跳过（如需新端口请先 stop）"
 } else {
     Remove-ProcIdFile "web"
+    $webCmd = if ($Dev) { "npm run dev -- -p $webPort" } else { "npm run start -- -p $webPort" }
+    $modeText = if ($Dev) { "dev" } else { "production" }
     $proc = Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c", "npm run dev -- -p $webPort" `
+        -ArgumentList "/c", $webCmd `
         -WorkingDirectory (Join-Path $repoRoot "apps\web") `
         -RedirectStandardOutput (Join-Path $logDir "web.out.log") `
         -RedirectStandardError (Join-Path $logDir "web.err.log") `
         -WindowStyle Hidden -PassThru
     Save-ProcId "web" $proc.Id
-    if (Wait-HttpOk "http://127.0.0.1:$webPort" 120) { Write-Ok "web 就绪（pid $($proc.Id)，端口 $webPort）" }
+    if (Wait-HttpOk "http://127.0.0.1:$webPort" 180) { Write-Ok "web 就绪（$modeText，pid $($proc.Id)，端口 $webPort）" }
     else {
         Write-Fail "web 健康检查未通过，日志尾部："
         Get-Content (Join-Path $logDir "web.err.log") -Tail 15 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "    $_" }

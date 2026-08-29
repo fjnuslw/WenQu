@@ -28,6 +28,21 @@ const createSchema = z.object({
   persona: personaSchema,
   maxQuestionsPerPhase: z.number().int().min(1).max(10).default(4),
   maxFollowUpDepth: z.number().int().min(1).max(4).default(4),
+  questions: z
+    .array(
+      z.object({
+        id: z.number().int(),
+        stem: z.string().min(1),
+        kind: z.string(),
+        answer: z
+          .string()
+          .nullable()
+          .optional()
+          .transform((value) => value ?? null),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 
 const turnSchema = z.object({
@@ -73,7 +88,15 @@ app.post("/sessions/:id/turn", async (c) => {
     if (error instanceof SessionNotFound) return c.json(errorBody("not_found", error.message), 404);
     throw error;
   }
-  const parsed = turnSchema.safeParse(await c.req.json());
+  const rawBody = await c.req.text();
+  console.log(`[turn] raw body (${rawBody.length} bytes):`, rawBody.slice(0, 240));
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawBody);
+  } catch {
+    return c.json(errorBody("validation_failed", `body 不是合法 JSON: ${rawBody.slice(0, 120)}`), 400);
+  }
+  const parsed = turnSchema.safeParse(parsedJson);
   if (!parsed.success) {
     return c.json(errorBody("validation_failed", parsed.error.issues.map(String).join("; ")), 422);
   }

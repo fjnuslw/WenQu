@@ -6,12 +6,23 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { agentsUrl, ApiError } from "@/lib/api";
+import { agentsUrl, apiFetch, ApiError } from "@/lib/api";
+
+const TRACK_OPTIONS = ["大模型应用", "大模型算法", "大模型应用算法", "视觉算法"] as const;
+
+interface PlanQuestion {
+  id: number;
+  stem: string;
+  kind: string;
+  answer: string | null;
+}
 
 export function InterviewStartForm() {
   const router = useRouter();
   const [role, setRole] = useState("大模型应用开发实习生");
   const [company, setCompany] = useState("");
+  const [track, setTrack] = useState("");
+  const [usePlan, setUsePlan] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +30,20 @@ export function InterviewStartForm() {
     setBusy(true);
     setError(null);
     try {
+      let questions: PlanQuestion[] | undefined;
+      if (usePlan) {
+        // 组卷：按公司/岗位大类从题库抽题（含手撕与算法）
+        const plan = await apiFetch<{ questions: PlanQuestion[] }>("/api/interview/plan", {
+          method: "POST",
+          body: JSON.stringify({
+            role,
+            company: company || undefined,
+            track: track || undefined,
+            size: 8,
+          }),
+        });
+        questions = plan.questions;
+      }
       const response = await fetch(agentsUrl("/sessions"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -27,6 +52,7 @@ export function InterviewStartForm() {
           persona: { role, ...(company ? { company } : {}) },
           maxQuestionsPerPhase: 4,
           maxFollowUpDepth: 4,
+          questions,
         }),
       });
       if (!response.ok) {
@@ -56,15 +82,42 @@ export function InterviewStartForm() {
         </div>
         <div className="space-y-1.5">
           <label className="text-xs text-ink-dim" htmlFor="company">
-            目标公司（可选，影响面试官追问风格）
+            目标公司（影响面试官风格与组卷频率榜）
           </label>
           <Input
             id="company"
-            placeholder="如：字节 / 阿里 / DeepSeek"
+            placeholder="如：字节跳动 / 阿里巴巴 / DeepSeek"
             value={company}
             onChange={(event) => setCompany(event.target.value)}
           />
         </div>
+        <div className="space-y-1.5">
+          <label className="text-xs text-ink-dim" htmlFor="track">
+            岗位大类（组卷侧重）
+          </label>
+          <select
+            id="track"
+            value={track}
+            onChange={(event) => setTrack(event.target.value)}
+            className="h-9 w-full rounded-md border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
+          >
+            <option value="">不限</option>
+            {TRACK_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-ink-dim">
+          <input
+            type="checkbox"
+            checked={usePlan}
+            onChange={(event) => setUsePlan(event.target.checked)}
+            className="size-3.5 accent-[#4f6ef7]"
+          />
+          从题库生成题单（按公司频率榜组卷，含手撕/算法）
+        </label>
         {error && (
           <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             启动失败：{error}

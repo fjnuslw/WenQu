@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { ApiError, apiFetch } from "@/lib/api";
 import { KIND_LABELS } from "@/lib/tags";
 import { cn } from "@/lib/utils";
@@ -49,12 +50,6 @@ interface Stats {
   by_kind: Record<string, number>;
   by_tag: Record<string, number>;
 }
-
-type LoadState =
-  | { phase: "loading" }
-  | { phase: "error"; message: string }
-  | { phase: "empty" }
-  | { phase: "ready"; data: QuestionsResponse };
 
 const TRACKS = ["大模型应用", "大模型算法", "大模型应用算法", "视觉算法", "通用基础"] as const;
 const PAGE_SIZES = [20, 50, 100] as const;
@@ -154,22 +149,37 @@ function FacetLabel({ text }: { text: string }) {
   );
 }
 
+/**
+ * 数据/加载态分离（TanStack Query placeholderData 等价实现，见 search/前端性能优化调研.md）：
+ * 拉取新数据期间保留旧列表并置灰，替代"清屏转圈"的闪烁。
+ */
+interface ListState {
+  items: QuestionItem[];
+  total: number;
+  isFetching: boolean;
+  loaded: boolean;
+  error: string | null;
+}
+
+const INITIAL_LIST: ListState = { items: [], total: 0, isFetching: false, loaded: false, error: null };
+
 export function QuestionsExplorer() {
-  const [state, setState] = useState<LoadState>({ phase: "loading" });
+  const [list, setList] = useState<ListState>(INITIAL_LIST);
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [company, setCompany] = useState("");
   const [track, setTrack] = useState("");
   const [kind, setKind] = useState("");
   const [tag, setTag] = useState("");
-  const [query, setQuery] = useState("");
+  const [queryInput, setQueryInput] = useState("");
+  const query = useDebouncedValue(queryInput, 300); // 防抖：只有停顿才触发请求
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(20);
 
   useEffect(() => {
     apiFetch<{ items: CompanyItem[] }>("/api/companies")
       .then((data) => setCompanies(data.items))
-      .catch(() => setCompanies([])); // logo 横条失败不阻塞题目列表，列表自身有错误态
+      .catch(() => setCompanies([]));
     apiFetch<Stats>("/api/questions/stats")
       .then(setStats)
       .catch(() => setStats(null));
@@ -182,7 +192,7 @@ export function QuestionsExplorer() {
 
   const load = useCallback(
     (signal: AbortSignal) => {
-      setState({ phase: "loading" });
+      setList((current) => ({ ...current, isFetching: true, error: null }));
       const params = new URLSearchParams({ limit: String(pageSize), offset: String((page - 1) * pageSize) });
       if (company) params.set("company", company);
       if (track) params.set("track", track);
@@ -190,18 +200,18 @@ export function QuestionsExplorer() {
       if (tag) params.set("tag", tag);
       if (query) params.set("q", query);
       apiFetch<QuestionsResponse>(`/api/questions?${params.toString()}`, { signal })
-        .then((data) => setState(data.items.length === 0 ? { phase: "empty" } : { phase: "ready", data }))
+        .then((data) =>
+          setList({ items: data.items, total: data.total, isFetching: false, loaded: true, error: null }),
+        )
         .catch((error: unknown) => {
           if (signal.aborted) return;
-          setState({
-            phase: "error",
-            message:
-              error instanceof ApiError
-                ? `${error.status} ${error.code}: ${error.message}`
-                : error instanceof Error
-                  ? error.message
-                  : "未知错误",
-          });
+          const message =
+            error instanceof ApiError
+              ? `${error.status} ${error.code}: ${error.message}`
+              : error instanceof Error
+                ? error.message
+                : "未知错误";
+          setList((current) => ({ ...current, isFetching: false, loaded: true, error: message }));
         });
     },
     [company, track, kind, tag, query, page, pageSize],
@@ -213,7 +223,7 @@ export function QuestionsExplorer() {
     return () => controller.abort();
   }, [load]);
 
-  const total = state.phase === "ready" ? state.data.total : 0;
+  const total = list.total;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageWindow = Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
     const start = Math.max(1, Math.min(page - 2, totalPages - 4));
@@ -228,6 +238,8 @@ export function QuestionsExplorer() {
         .slice(0, 18)
     : [];
 
+  const showEmpty = list.loaded && !list.error && list.items.length === 0;
+
   return (
     <div className="space-y-4">
       {/* 搜索置顶：体感最关键的入口 */}
@@ -237,9 +249,12 @@ export function QuestionsExplorer() {
           <Input
             className="h-10 pl-9 text-sm"
             placeholder="搜索题干：如 RAG、Agent、KV Cache、手撕 Attention…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={queryInput}
+            onChange={(event) => setQueryInput(event.target.value)}
           />
+          {list.isFetching && (
+            <RefreshCw className="absolute right-3 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-ink-faint" />
+          )}
         </div>
       </Card>
 
@@ -339,31 +354,25 @@ export function QuestionsExplorer() {
         </div>
       </Card>
 
-      {state.phase === "loading" && (
-        <div className="flex items-center justify-center gap-2 py-16 text-sm text-ink-faint">
-          <RefreshCw className="size-4 animate-spin" /> 加载中…
-        </div>
-      )}
-      {state.phase === "error" && (
-        <Card className="border-danger/40 p-8 text-center">
-          <AlertTriangle className="mx-auto mb-3 size-6 text-danger" />
-          <p className="text-sm text-danger">无法加载题库：{state.message}</p>
-          <p className="mt-2 text-xs text-ink-dim">错误显式呈现，不做兜底数据。</p>
+      {list.error && (
+        <Card className="border-danger/40 p-5 text-center">
+          <AlertTriangle className="mx-auto mb-2 size-5 text-danger" />
+          <p className="text-sm text-danger">加载失败：{list.error}</p>
           <button
             onClick={() => load(new AbortController().signal)}
-            className="mt-4 rounded-md border border-line px-4 py-1.5 text-xs text-ink-dim hover:border-line-strong hover:text-ink"
+            className="mt-3 rounded-md border border-line px-4 py-1.5 text-xs text-ink-dim hover:border-line-strong hover:text-ink"
           >
             重试
           </button>
         </Card>
       )}
-      {state.phase === "empty" && (
+      {showEmpty && (
         <Card className="p-10 text-center">
           <Inbox className="mx-auto mb-3 size-6 text-ink-faint" />
           <p className="text-sm text-ink-dim">当前筛选没有题目 —— 试试放宽条件，或等待后台导入。</p>
         </Card>
       )}
-      {state.phase === "ready" && (
+      {list.items.length > 0 && (
         <>
           <div className="flex items-center justify-between text-xs text-ink-dim">
             <span>共 {total} 题</span>
@@ -381,8 +390,9 @@ export function QuestionsExplorer() {
               条
             </span>
           </div>
-          <div className="space-y-2">
-            {state.data.items.map((question) => (
+          {/* 拉取期间保留旧列表并置灰（keepPreviousData 等价） */}
+          <div className={cn("space-y-2 transition-opacity", list.isFetching && "opacity-60")}>
+            {list.items.map((question) => (
               <Card key={question.id} className="card-hover p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
