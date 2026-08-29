@@ -124,7 +124,7 @@ function ThinkingTrace({
       <div
         className={cn(
           "mt-1.5 whitespace-pre-wrap border-l-2 border-line pl-2.5 leading-relaxed text-ink-faint",
-          compact ? "text-[11px]" : "text-xs",
+          compact ? "text-xs" : "text-xs",
         )}
       >
         {thinking}
@@ -420,7 +420,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
 
       {question && (
         <div className="mb-3 rounded-lg border border-accent/30 bg-accent-soft/60 px-3.5 py-2.5">
-          <div className="text-[11px] font-medium text-accent">
+          <div className="text-xs font-medium text-accent">
             当前题目（{question.index}/{question.total}）
           </div>
           <div className="mt-0.5 line-clamp-2 text-xs text-ink">{question.stem}</div>
@@ -449,7 +449,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
               className="bubble-in mr-auto flex max-w-[92%] items-start gap-2.5"
               onClick={message.thinking ? () => setPanelIdx(index) : undefined}
             >
-              <span className="brand-tile mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-[11px] font-semibold text-white">
+              <span className="brand-tile mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-xs font-semibold text-white">
                 {avatarChar}
               </span>
               <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-surface-2 px-4 py-3 text-sm leading-relaxed text-ink">
@@ -512,7 +512,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
             </Button>
           )}
         </div>
-        <p className="mt-2 text-center text-[11px] text-ink-faint">
+        <p className="mt-2 text-center text-xs text-ink-faint">
           <span className="kbd">Enter</span> 发送 · {isAnswerMode ? "max 档深度思考 + 联网核实" : isGrillMode ? "拷打官可实时读你的代码查证（只读工具面）" : "阶段推进与追问深度由确定性状态机控制"} · 支持完整 markdown/公式渲染
         </p>
       </div>

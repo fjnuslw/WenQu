@@ -3,7 +3,6 @@
 import {
   Layers,
   LayoutDashboard,
-  History,
   Newspaper,
   Swords,
   UserRoundSearch,
@@ -24,7 +23,6 @@ const NAV_ITEMS = [
   { href: "/grilling", label: "项目拷打", icon: Swords },
   { href: "/resume", label: "简历工作台", icon: UserRoundSearch },
   { href: "/review", label: "复习队列", icon: RotateCcw },
-  { href: "/sessions", label: "会话记录", icon: History },
 ] as const;
 
 export function AppSidebar() {
@@ -37,12 +35,12 @@ export function AppSidebar() {
         </span>
         <div className="leading-tight">
           <div className="text-sm font-semibold tracking-wide">问渠 WenQu</div>
-          <div className="text-[10px] text-ink-faint">大模型求职备战 · spec v0.3</div>
+          <div className="text-xs text-ink-faint">大模型求职备战 · spec v0.3</div>
         </div>
       </div>
 
       <nav className="flex-1 space-y-0.5 p-2.5">
-        <div className="px-3 pb-1.5 pt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+        <div className="px-3 pb-1.5 pt-1 text-xs font-medium uppercase tracking-[0.14em] text-ink-faint">
           备战
         </div>
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
@@ -69,7 +67,7 @@ export function AppSidebar() {
       </nav>
 
       <div className="border-t border-line px-4 py-3">
-        <div className="flex items-center gap-2 text-[11px] text-ink-faint">
+        <div className="flex items-center gap-2 text-xs text-ink-faint">
           <Zap className="size-3 text-accent" />
           <span>K1 知识冷启动进行中</span>
         </div>

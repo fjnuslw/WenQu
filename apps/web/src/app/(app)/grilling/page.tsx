@@ -2,7 +2,7 @@
 
 import { FolderOpen, Search, Swords, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,29 @@ interface ResumeListItem {
   candidate_name: string | null;
 }
 
+interface ProjectCard {
+  id: number;
+  name: string;
+  status: string;
+  error?: string | null;
+  file_count: number;
+  module_count: number;
+  overview: string;
+  in_projects_dir: boolean;
+  created_at: string | null;
+}
+
+interface SessionItem {
+  id: string;
+  mode: string;
+  persona: { role?: string; company?: string };
+  turns: number;
+  projectName: string | null;
+  projectId: number | null;
+  last_ts: string | null;
+  alive: boolean;
+}
+
 const STATUS_BADGE: Record<string, { label: string; variant: "ok" | "warn" | "danger" }> = {
   supported: { label: "有据", variant: "ok" },
   suspicious: { label: "存疑", variant: "warn" },
@@ -54,6 +77,9 @@ export default function GrillingPage() {
   const [progress, setProgress] = useState<{ step: string; progress: number } | null>(null);
   const [prep, setPrep] = useState<GrillPrep | null>(null);
   const [starting, setStarting] = useState(false);
+  const [projects, setProjects] = useState<ProjectCard[] | null>(null);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [expandedProject, setExpandedProject] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
@@ -66,6 +92,27 @@ export default function GrillingPage() {
       })
       .catch(() => setResumes([]));
   }, []);
+
+  const loadProjects = useCallback(async () => {
+    try {
+      const [projectList, sessionList] = await Promise.all([
+        apiFetch<{ items: ProjectCard[] }>("/api/grill/projects"),
+        fetch(agentsUrl("/sessions")).then(async (response) =>
+          response.ok ? ((await response.json()) as { items: SessionItem[] }).items : [],
+        ),
+      ]).catch(() => [null, []] as const);
+      if (projectList) setProjects(projectList.items);
+      setSessions(
+        (sessionList as SessionItem[]).filter((item) => item.mode === "grill" && item.projectName),
+      );
+    } catch {
+      // 板块加载失败不阻塞新备课
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
 
   async function prepareDir() {
     const trimmed = localPath.trim();
@@ -189,8 +236,8 @@ export default function GrillingPage() {
     }
   }
 
-  async function startGrill() {
-    if (!prep) return;
+  /** 开一场拷打会话（新备课产物或已存项目均可）。 */
+  async function startGrill(project: GrillPrep) {
     setStarting(true);
     setError(null);
     try {
@@ -203,11 +250,11 @@ export default function GrillingPage() {
           maxQuestionsPerPhase: 6,
           maxFollowUpDepth: 4,
           grill: {
-            projectId: prep.project_id,
-            projectName: prep.name,
-            repoRoot: prep.repo_root,
-            briefing: prep.briefing,
-            claimChecks: prep.claim_checks,
+            projectId: project.project_id,
+            projectName: project.name,
+            repoRoot: project.repo_root,
+            briefing: project.briefing,
+            claimChecks: project.claim_checks,
           },
         }),
       });
@@ -216,11 +263,34 @@ export default function GrillingPage() {
         throw new Error(body?.error?.message ?? `创建拷打会话失败: ${response.status}`);
       }
       const { id } = (await response.json()) as { id: string };
-      router.push(`/interview/${id}?mode=grill&project=${prep.project_id}`);
+      router.push(`/interview/${id}?mode=grill&project=${project.project_id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setStarting(false);
+    }
+  }
+
+  /** 项目卡片上直接开打：拉详情（含 briefing）→ 建会话。 */
+  async function reloadAndStart(projectId: number) {
+    setError(null);
+    try {
+      const detail = await apiFetch<GrillPrep & { status?: string }>(`/api/grill/projects/${projectId}`);
+      if (!detail.briefing) throw new Error("该项目还没有备课产物");
+      await startGrill(detail);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function removeProject(id: number, name: string) {
+    if (!window.confirm(`删除项目「${name}」？备课产物与历次拷打记录入口将一并移除（原目录不受影响时不动源码）。`)) return;
+    setError(null);
+    try {
+      await apiFetch(`/api/grill/projects/${id}`, { method: "DELETE" });
+      await loadProjects();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
     }
   }
 
@@ -275,11 +345,11 @@ export default function GrillingPage() {
                   <FolderOpen className={prepping ? "size-4 animate-pulse" : "size-4"} />
                   {prepping ? "处理中…" : "选择项目文件夹…"}
                 </Button>
-                <span className="text-[11px] text-ink-faint">
+                <span className="text-xs text-ink-faint">
                   系统文件管理器选目录 → 浏览器打包上传（node_modules 等自动过滤）
                 </span>
               </div>
-              <details className="text-[11px] text-ink-faint">
+              <details className="text-xs text-ink-faint">
                 <summary className="cursor-pointer select-none hover:text-ink-dim">
                   高级：粘贴服务器本地路径（原位读取，零上传）
                 </summary>
@@ -364,7 +434,7 @@ export default function GrillingPage() {
                   style={{ width: `${Math.max(3, progress?.progress ?? 3)}%` }}
                 />
               </div>
-              <p className="text-[11px] leading-relaxed text-ink-faint">
+              <p className="text-xs leading-relaxed text-ink-faint">
                 读码 → 分批 LLM 备课 → {resumeId !== null ? "简历声明对照 → " : ""}完成。大仓库需要几分钟，进度实时更新，可以离开本页稍后在下面列表里回来。
               </p>
             </div>
@@ -381,8 +451,8 @@ export default function GrillingPage() {
                 <span className="text-base font-semibold text-ink">{prep.name}</span>
                 <Badge variant="accent">{prep.file_count} 个文件</Badge>
                 {prep.resume_used && <Badge>已对照简历</Badge>}
-                <span className="font-mono text-[11px] text-ink-faint">{prep.repo_root}</span>
-                <Button className="ml-auto" onClick={() => void startGrill()} disabled={starting}>
+                <span className="font-mono text-xs text-ink-faint">{prep.repo_root}</span>
+                <Button className="ml-auto" onClick={() => void startGrill(prep)} disabled={starting}>
                   <Swords className={starting ? "size-4 animate-pulse" : "size-4"} />
                   {starting ? "创建拷打会话…" : "开始拷打"}
                 </Button>
@@ -424,7 +494,7 @@ export default function GrillingPage() {
                 {prep.briefing.modules.map((module, index) => (
                   <div key={index} className="rounded-lg bg-surface-2 p-3">
                     <p className="text-sm font-medium text-ink">{module.purpose}</p>
-                    <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
+                    <p className="mt-0.5 font-mono text-xs text-ink-faint">
                       {module.files.slice(0, 4).join(" · ")}
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
@@ -446,6 +516,87 @@ export default function GrillingPage() {
           </Card>
         </div>
       )}
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-sm font-semibold text-ink">已备课项目</h2>
+        {projects === null && <p className="text-xs text-ink-dim">加载中…</p>}
+        {projects !== null && projects.length === 0 && (
+          <p className="text-xs text-ink-faint">还没有备课过的项目——上面选个目录开始第一次备课。</p>
+        )}
+        <div className="space-y-3">
+          {projects?.map((project) => {
+            const projectSessions = sessions.filter((item) => item.projectName === project.name);
+            return (
+              <Card key={project.id} className="card-hover">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-sm font-semibold text-ink">{project.name}</span>
+                    {project.status === "ready" ? (
+                      <span className="text-xs text-ink-dim">
+                        {project.file_count} 文件 · {project.module_count} 模块
+                      </span>
+                    ) : project.status === "failed" ? (
+                      <span className="text-xs text-danger">备课失败：{project.error ?? "未知"}</span>
+                    ) : (
+                      <span className="text-xs text-warn">备课中…</span>
+                    )}
+                    <span className="ml-auto text-xs text-ink-faint">
+                      {project.created_at ? new Date(project.created_at).toLocaleString("zh-CN") : ""}
+                    </span>
+                  </div>
+                  {project.overview && (
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-ink-dim">{project.overview}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {project.status === "ready" && (
+                      <Button size="sm" onClick={() => void reloadAndStart(project.id)} disabled={starting}>
+                        <Swords className="size-3.5" />
+                        {projectSessions.length > 0 ? "再开一场" : "开始拷打"}
+                      </Button>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
+                    >
+                      {expandedProject === project.id ? "收起拷打记录" : `拷打记录（${projectSessions.length}）`}
+                    </Button>
+                    <Button variant="danger" size="sm" onClick={() => void removeProject(project.id, project.name)}>
+                      删除
+                    </Button>
+                  </div>
+                  {expandedProject === project.id && (
+                    <div className="mt-3 space-y-1.5 border-t border-line pt-3">
+                      {projectSessions.length === 0 && (
+                        <p className="text-xs text-ink-faint">这个项目还没有拷打记录。</p>
+                      )}
+                      {projectSessions.map((item) => (
+                        <button
+                          key={item.id}
+                          className="flex w-full items-baseline gap-x-3 rounded-md px-2 py-1.5 text-left hover:bg-surface-2"
+                          onClick={() =>
+                            router.push(
+                              `/interview/${item.id}?mode=grill${item.projectId !== null ? `&project=${item.projectId}` : ""}`,
+                            )
+                          }
+                        >
+                          <span className="text-xs font-medium text-ink">
+                            {item.last_ts ? new Date(item.last_ts).toLocaleString("zh-CN") : "—"}
+                          </span>
+                          <span className="text-xs text-ink-dim">{item.turns} 轮</span>
+                          <span className={`ml-auto text-xs ${item.alive ? "text-ok" : "text-ink-faint"}`}>
+                            {item.alive ? "可继续" : "仅回放"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

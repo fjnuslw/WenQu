@@ -68,7 +68,7 @@ export default function DashboardPage() {
           <Card key={stat.label} className="p-4">
             <div className="text-xs text-ink-dim">{stat.label}</div>
             <div className="mt-1.5 text-2xl font-semibold tracking-tight">{stat.value}</div>
-            <div className="mt-1 text-[11px] text-ink-faint">{stat.hint}</div>
+            <div className="mt-1 text-xs text-ink-faint">{stat.hint}</div>
           </Card>
         ))}
       </div>

@@ -263,7 +263,7 @@ export default function ExperiencesPage() {
         {filtered.map((experience) => (
           <Card key={experience.id} className="card-hover">
             <CardContent className="p-5">
-              <div className="mb-3 flex flex-wrap items-center gap-2.5">
+              <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                 {experience.company ? (
                   <span className="flex items-center gap-2">
                     <CompanyLogo name={experience.company} logo={experience.company_logo} size="sm" />
@@ -272,19 +272,16 @@ export default function ExperiencesPage() {
                 ) : (
                   <span className="text-sm font-medium text-ink-dim">公司未识别</span>
                 )}
-                {experience.role && <Badge>{experience.role}</Badge>}
-                {experience.round && <Badge variant="accent">{experience.round}</Badge>}
+                {/* 非状态信息合为一行分隔点文字（字体收敛：去徽章堆叠），仅结果保留徽章 */}
+                <span className="text-xs text-ink-dim">
+                  {[experience.role, experience.round, experience.occurred_on].filter(Boolean).join(" · ")}
+                </span>
                 {experience.result && experience.result !== "未知" && (
-                  <Badge variant={experience.result === "通过" ? "ok" : "warn"}>
-                    {experience.result}
-                  </Badge>
+                  <Badge variant={experience.result === "通过" ? "ok" : "warn"}>{experience.result}</Badge>
                 )}
                 <span className="ml-auto flex items-center gap-3">
                   {experience.source_name && (
-                    <span className="text-[11px] text-ink-faint">来源：{experience.source_name}</span>
-                  )}
-                  {experience.occurred_on && (
-                    <span className="text-xs text-ink-faint">{experience.occurred_on}</span>
+                    <span className="text-xs text-ink-faint">{experience.source_name}</span>
                   )}
                   {experience.url && (
                     <a

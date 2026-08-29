@@ -129,7 +129,7 @@ export default function ResumePage() {
             <Upload className={uploading ? "size-4 animate-pulse" : "size-4"} />
             {uploading ? "解析中（约 20-40s）…" : "上传简历 PDF"}
           </Button>
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-xs text-ink-faint">
             仅支持 PDF（≤10MB）。解析经 LLM 结构化：同一份简历的迭代版本会作为新记录并存。
           </p>
           {error && <p className="text-sm text-danger">出错了：{error}</p>}
@@ -184,7 +184,7 @@ export default function ResumePage() {
               )}
               {(profile.exam_tags ?? []).length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] text-ink-faint">考点标签：</span>
+                  <span className="text-xs text-ink-faint">考点标签：</span>
                   {profile.exam_tags?.map((tag) => (
                     <Badge key={tag} variant="accent">
                       {tag}

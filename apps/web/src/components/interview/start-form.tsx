@@ -131,7 +131,7 @@ export function InterviewStartForm() {
             ))}
           </select>
           {resumes.length === 0 && (
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-xs text-ink-faint">
               还没有简历：先到「简历工作台」上传 PDF，面试官才能针对简历押题。
             </p>
           )}
@@ -188,7 +188,7 @@ export function InterviewStartForm() {
         <Button className="w-full" onClick={start} disabled={busy || role.trim().length === 0}>
           {busy ? "组卷并创建会话中…" : "进入面试室"}
         </Button>
-        <p className="text-center text-[11px] text-ink-faint">
+        <p className="text-center text-xs text-ink-faint">
           需要 apps/agents 在线（http://127.0.0.1:23481）并配置 DEEPSEEK_API_KEY
         </p>
       </CardContent>

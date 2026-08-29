@@ -129,23 +129,20 @@ export default function ReviewPage() {
         {items?.map((item) => (
           <Card key={item.id} className="card-hover">
             <CardContent className="p-5">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
+              <div className="mb-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                 <Badge variant={item.overdue ? "warn" : "accent"}>
                   {item.overdue ? "已逾期" : `到期 ${item.due_on}`}
                 </Badge>
-                {item.tag && <Badge>{item.tag}</Badge>}
-                <span className="ml-auto text-[11px] text-ink-faint">
-                  间隔 {item.interval_days} 天 ·  ease {item.ease} · 第 {item.repetitions + 1} 次
-                  {item.lapses > 0 ? ` · 遗忘 ${item.lapses} 次` : ""}
+                <span className="text-xs text-ink-dim">
+                  {[item.tag, `间隔 ${item.interval_days} 天`, `第 ${item.repetitions + 1} 次`,
+                    ...(item.lapses > 0 ? [`遗忘 ${item.lapses} 次`] : [])].filter(Boolean).join(" · ")}
                 </span>
+                {item.source_ref && (
+                  <span className="ml-auto text-xs text-ink-faint">会话 {item.source_ref.slice(0, 8)}…</span>
+                )}
               </div>
               <p className="text-sm font-medium leading-relaxed text-ink">{item.question_text}</p>
               <p className="mt-1.5 text-xs leading-relaxed text-ink-dim">{item.weakness}</p>
-              {item.source_ref && (
-                <p className="mt-1.5 text-[11px] text-ink-faint">
-                  来源：会话 {item.source_ref.slice(0, 8)}…
-                </p>
-              )}
               <div className="mt-3.5 flex items-center gap-2">
                 {GRADE_BUTTONS.map((button) => (
                   <Button

@@ -66,7 +66,7 @@ function TreeItem({
     return (
       <div>
         <button
-          className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] text-ink-dim hover:bg-surface"
+          className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-xs text-ink-dim hover:bg-surface"
           style={{ paddingLeft: depth * 10 + 2 }}
           onClick={() => setOpen((value) => !value)}
         >
@@ -83,7 +83,7 @@ function TreeItem({
   return (
     <button
       className={cn(
-        "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left font-mono text-[11px] hover:bg-surface",
+        "flex w-full items-center gap-1 rounded px-1 py-0.5 text-left font-mono text-xs hover:bg-surface",
         openedFile === node.path ? "bg-accent-soft text-accent" : "text-ink-faint",
       )}
       style={{ paddingLeft: depth * 10 + 2 }}
@@ -170,26 +170,26 @@ export function FileBrowser({ projectId }: { projectId: number }) {
       <div className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2">
         <Search className="size-3 shrink-0 text-ink-faint" />
         <input
-          className="h-7 w-full bg-transparent text-[11px] text-ink outline-none placeholder:text-ink-faint"
+          className="h-7 w-full bg-transparent text-xs text-ink outline-none placeholder:text-ink-faint"
           placeholder="过滤文件…"
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-line bg-surface/60 p-1.5">
-        {tree === null && !error && <p className="px-1 text-[11px] text-ink-faint">加载文件树…</p>}
-        {error && <p className="px-1 text-[11px] text-danger">{error}</p>}
+        {tree === null && !error && <p className="px-1 text-xs text-ink-faint">加载文件树…</p>}
+        {error && <p className="px-1 text-xs text-danger">{error}</p>}
         {filteredTree?.map((node) => (
           <TreeItem key={node.path} node={node} depth={0} openedFile={file?.path ?? null} onOpenFile={(path) => void openFile(path)} />
         ))}
       </div>
       <div ref={viewerRef} className="min-h-0 flex-1 overflow-auto rounded-md border border-line bg-[#0d0f13] p-0">
         {file === null ? (
-          <p className="p-3 text-[11px] leading-relaxed text-ink-faint">
+          <p className="p-3 text-xs leading-relaxed text-ink-faint">
             点击左侧文件查看内容；拷打官回复中的 文件:行号 引用可直接点开并定位。
           </p>
         ) : (
-          <div className="min-w-max py-1 font-mono text-[11px] leading-[1.5]">
+          <div className="min-w-max py-1 font-mono text-xs leading-[1.5]">
             {file.lines.map((line, index) => {
               const lineNo = index + 1;
               const highlighted = highlightLine === lineNo;
@@ -206,7 +206,7 @@ export function FileBrowser({ projectId }: { projectId: number }) {
             })}
           </div>
         )}
-        {loadingFile && <p className="p-2 text-[11px] text-ink-faint">读取中…</p>}
+        {loadingFile && <p className="p-2 text-xs text-ink-faint">读取中…</p>}
       </div>
     </div>
   );
