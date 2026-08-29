@@ -277,7 +277,7 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **收集器修正（B）**：EXCLUDE_DIRS 补 miniprogram_npm/uni_modules/taro-dist 等；文档类（md/txt）单文件 8KB 截断，预算优先源码。
   - **文件管理器选择（C）**：`<input webkitdirectory>`（浏览器原生目录选择对话框）+ JSZip 客户端打包 → 走 zip 通道（浏览器安全模型拿不到绝对路径，本地 localhost 上传零成本）；粘贴路径保留为高级方式。
   - **会话持久化与恢复（D）**：agents 增 GET /sessions（列表：mode/persona/轮数/时间）与 GET /sessions/:id/history（JSONL 重放 user/assistant/tool_use）；ChatRoom 挂载即拉历史（刷新/换设备继续聊，会话在 agents 内存仍存活时直接续）；agents 重启后的历史会话只读回放。
-  - **拷打文件侧栏（E）**：api 增 tree/file 端点（路径监狱）；grill 模式右栏改双 tab（思考过程/项目文件——树浏览+行号查看器）；拷打官回复中的 `文件:行号` 引用渲染为可点击链接 → 打开侧栏对应文件并滚动高亮该行（dsh 式证据可核）。
+  - **拷打文件侧栏（E）**：api 增 tree/file 端点（路径监狱，越界显式 400）；grill 模式右栏改双 tab（思考过程/项目文件——树浏览+行号查看器）；拷打官回复中的 `文件:行号` 引用渲染为可点击链接 → 打开侧栏对应文件并滚动高亮该行（dsh 式证据可核）。**已全部落地（4d7d3b0）**：E2E——异步备课（POST 立即返回 → 5 批 LLM 备课进度逐批上报 → ready）；agents 会话列表（30 条，含用户 weixin 拷打）与历史重放（含思考全文）；浏览器实测点击 `chat-room.tsx:66` 引用 → 右栏切文件 tab → 打开文件高亮定位第 66 行（拷打官 prompt 增引用格式约束 `相对路径:行号`）。收集器修正实测：web-app 备课 41 文件源码为主（此前 weixin 被 md 吃满预算）。
 
 ## 10. 合规与 License 策略
 
