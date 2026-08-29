@@ -161,9 +161,15 @@ export class SessionManager {
           introduceNext = false;
         }
         // 追问打满：该题记盲区，introduceNext 保持 true，下方出下一题
-      }        if (introduceNext) {
-          const q = session.questions[session.qIndex];
-          if (q === undefined) throw new Error("题队列耗尽却尝试出题（状态机越界），显式失败");
+      }
+      if (introduceNext) {
+        const q = session.questions[session.qIndex];
+        if (q === undefined) {
+          // 题单已答完：进入收尾；后续轮次维持 closing（重复播报收尾指令，状态稳定）
+          session.state = { ...session.state, phase: "closing", followUpDepth: 0 };
+          sink({ type: "phase", phase: "closing" });
+          directives.push("[导演指令] 题单已全部完成，请做总结收尾，不再提出新问题。");
+        } else {
           session.qIndex += 1;
           session.state = {
             ...session.state,
@@ -179,11 +185,8 @@ export class SessionManager {
             kind: q.kind,
           });
           directives.push(questionDirective(session.qIndex, session.questions.length, q));
-        } else {
-          session.state = { ...session.state, phase: "closing", followUpDepth: 0 };
-          sink({ type: "phase", phase: "closing" });
-          directives.push("[导演指令] 题单已全部完成，请做总结收尾，不再提出新问题。");
         }
+      }
     } else {
       // ---- 无题单：原状态机 ----
       if (input.vagueAnswer === true) {
