@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from getoffer.api.deps import get_db_session, get_gateway, get_settings
@@ -148,3 +148,26 @@ async def get_resume(
     if row is None:
         raise NotFound(f"简历不存在: {resume_id}")
     return {"id": row.id, "file_name": Path(row.file_path).name, "profile": row.parsed or {}}
+
+
+@router.delete("/{resume_id}")
+async def delete_resume(
+    resume_id: int,
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """删除简历（行 + 声明 + 本地 PDF 文件）。本地单用户工具：删除后重新上传即替换。"""
+    row = await session.get(Resume, resume_id)
+    if row is None:
+        raise NotFound(f"简历不存在: {resume_id}")
+    await session.execute(
+        delete(ResumeClaim).where(ResumeClaim.resume_id == resume_id)
+    )
+    await session.delete(row)
+    await session.commit()
+    removed_file = False
+    file_path = Path(row.file_path)
+    if file_path.is_file() and file_path.parent == settings.uploads_dir:
+        file_path.unlink(missing_ok=True)
+        removed_file = True
+    return {"deleted": resume_id, "file_removed": removed_file}

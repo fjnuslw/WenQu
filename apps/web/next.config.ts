@@ -3,12 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // 开发期允许 127.0.0.1/localhost 访问 dev 资源（Next 16 默认拦截跨源 dev 资源，会导致 hydration 静默失败）
   allowedDevOrigins: ["127.0.0.1", "localhost"],
-  async rewrites() {
-    // /api 同源代理（JSON，无流式）。/agents 走专用 Route Handler（SSE 流式需要独立上游连接，
-    // 见 apps/web/src/app/agents/[...path]/route.ts 的说明）。
-    const api = process.env.API_PROXY_TARGET ?? "http://127.0.0.1:23480";
-    return [{ source: "/api/:path*", destination: `${api}/api/:path*` }];
-  },
+  // /api 与 /agents 都走专用 Route Handler（node:http + keepAlive:false）：
+  // rewrites 的 undici fetch 会把长 POST 在 ~30s 处 ECONNRESET（备课/采集实测），
+  // node:http 代理在 SSE 40s+ 场景已验证稳定。见 app/api/[...path]/route.ts 与
+  // app/agents/[...path]/route.ts。
 };
 
 export default nextConfig;

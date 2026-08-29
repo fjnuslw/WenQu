@@ -92,11 +92,25 @@ export default function ResumePage() {
     }
   }
 
+  async function remove(id: number) {
+    setError(null);
+    try {
+      await apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
+      await loadList();
+      if (selectedId === id) {
+        setSelectedId(null);
+        setProfile(null);
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl p-8">
       <PageHeader
         title="简历工作台"
-        description="上传简历 → 结构化画像（技术栈/项目要点/考点标签）→ 模拟面试按简历押题；项目要点同时是项目拷打的声明底稿。"
+        description="上传简历 → 结构化画像（技术栈/项目要点/考点标签）→ 模拟面试按简历押题；项目要点同时是项目拷打的声明底稿。替换简历 = 删除旧版后重新上传。文件只存本地 data/uploads（已 gitignore，不会进 GitHub）。"
       />
 
       <Card className="mb-5">
@@ -125,19 +139,26 @@ export default function ResumePage() {
       {resumes && resumes.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-2">
           {resumes.map((resume) => (
-            <button
+            <span
               key={resume.id}
-              className={cn(
-                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+              className={
                 selectedId === resume.id
-                  ? "border-accent/60 bg-accent-soft text-accent"
-                  : "border-line bg-surface-2 text-ink-dim hover:border-line-strong hover:text-ink",
-              )}
-              onClick={() => setSelectedId(resume.id)}
+                  ? "inline-flex items-center gap-1 rounded-full border border-accent/60 bg-accent-soft px-3.5 py-1.5 text-xs font-medium text-accent"
+                  : "inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 px-3.5 py-1.5 text-xs text-ink-dim"
+              }
             >
-              {resume.candidate_name ? `${resume.candidate_name} · ` : ""}
-              {resume.file_name}
-            </button>
+              <button className="hover:text-ink" onClick={() => setSelectedId(resume.id)}>
+                {resume.candidate_name ? `${resume.candidate_name} · ` : ""}
+                {resume.file_name}
+              </button>
+              <button
+                className="ml-0.5 rounded-full px-1 text-ink-faint transition-colors hover:bg-danger/15 hover:text-danger"
+                title="删除这份简历（替换请删除后重新上传）"
+                onClick={() => void remove(resume.id)}
+              >
+                ×
+              </button>
+            </span>
           ))}
         </div>
       )}

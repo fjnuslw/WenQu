@@ -289,20 +289,33 @@ async def check_claims(
 
 async def prepare_project(
     *,
-    zip_bytes: bytes,
+    zip_bytes: bytes | None,
+    local_path: str | None,
     name: str,
     session: AsyncSession,
     gateway: LLMGateway,
     settings: Settings,
     resume_id: int | None = None,
 ) -> dict[str, Any]:
-    """zip → 解压 → 收集 → 备课 →（可选）声明对照 → 落库。返回给前端/agents 的完整备课包。"""
-    project_root = settings.projects_dir / name.replace("/", "_")
-    if project_root.exists():
-        raise ValidationFailed(f"项目目录已存在: {name}（请换名或先删除）")
-    written, skipped = extract_zip_safely(zip_bytes, project_root)
-    if written == 0:
-        raise ValidationFailed("zip 内没有有效文件（全部被噪声过滤或为空包）")
+    """两种接入：zip 上传（解压到 data/projects/{name}）或 本地目录路径（原位读取，零拷贝——
+    本地部署形态下最自然，dsh 式工作流）。其余流程一致：收集 → 备课 → 声明对照 → 落库。"""
+    if zip_bytes is not None:
+        project_root = settings.projects_dir / name
+        if project_root.exists():
+            raise ValidationFailed(f"项目目录已存在: {name}（请换名或先删除）")
+        written, skipped = extract_zip_safely(zip_bytes, project_root)
+        if written == 0:
+            raise ValidationFailed("zip 内没有有效文件（全部被噪声过滤或为空包）")
+    elif local_path:
+        candidate = Path(local_path)
+        if not candidate.is_absolute():
+            raise ValidationFailed("local_path 必须是绝对路径（本地部署形态，用户显式指定）")
+        if not candidate.is_dir():
+            raise ValidationFailed(f"目录不存在或不是目录: {local_path}")
+        project_root = candidate
+        skipped = []
+    else:
+        raise ValidationFailed("需要 zip 文件或 local_path 目录路径之一")
     snapshot = collect_files(project_root)
 
     briefing = await run_briefing(snapshot, gateway, tag_families=[])
