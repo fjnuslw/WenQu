@@ -216,6 +216,7 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **分类收敛语义修复**：分类判据从"无公司标注"改为"track 为空 OR classify_attempted_at 为空"——旧判据会把"LLM 已判定无把握厂商"的题永远重选，阻塞后面全部积压（守护误报追平）。`questions.classify_attempted_at` 列标记尝试即出池。
 - **题库页体验补齐**：`GET /api/questions/stats` 输出 track/kind/tag facet 计数；前端分页器（页码窗口+每页 20/50/100）、岗位大类与题型徽章带数量、"未分类 N（回填中）"诚实计数。商汤 logo 追加。
 - **2026-08-29 续**：① 厂商 logo 补齐至 **21/25**（新增 DeepSeek/华为/蚂蚁/智谱/讯飞/月之暗面，商汤换高清版；缺 MiniMax/阶跃星辰/拼多多/小米 待素材）；② **track 增加"视觉算法"**（CV/CNN/ViT/多模态），存量 track 全量重置重判；③ 标签归一（tag_vocab 规范词表 + 别名表 + normalize_tags 脚本，修复小写漂移导致的 RAG/Agent 筛选零命中）；④ 题库页搜索置顶、厂商瓷片加大、标签 chips 由真实计数驱动；⑤ 配置/data 目录全部锚定仓库根（cwd 无关）， agents 会话目录与 api 对齐，导演回声泄漏做确定性清理。
+- **2026-08-29 续二（同源代理架构，根治题库页 Failed to fetch）**：浏览器跨端口直连后端在真实浏览器环境（系统代理/端口漂移叠加）下不可靠。改为 **Next.js rewrites 同源代理**：`/api/*`→api、`/agents/*`→agents，前端只与 web 端口通信（SSE 流式经代理实测可用）；`start.ps1` 每次启动把实际解析端口写入 `.env.local`（API_PROXY_TARGET/AGENTS_PROXY_TARGET）并新增**启动前端口清障守卫**（本项目进程占用目标端口即清理——Next16 dev 单实例锁会让新实例静默退出，是多次"重启无效"的元凶）。仓库已推送：github.com/fjnuslw/WenQu（git 代理配置 127.0.0.1:7897）。
 - **I1 开工（第一块：评分报告）**：`POST/GET /api/sessions/{id}/report`——读取 agents 会话 JSONL → LLM 多维 rubric（理解深度/设计决策/表达结构/诚实度，带原话证据）→ 评分+失分点+带标签的复习建议 → 持久化 interview_sessions.score。端到端实测通过（真实会话两轮 → 报告质量达标）。失分点回流 SM-2（F6）据此推进。
 
 ## 10. 合规与 License 策略
