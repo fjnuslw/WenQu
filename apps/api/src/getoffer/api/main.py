@@ -65,7 +65,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from getoffer.api.routers import companies, experiences, ingest, interview, questions, resumes, sessions
+    from getoffer.api.routers import (
+        companies,
+        experiences,
+        ingest,
+        interview,
+        questions,
+        resumes,
+        review,
+        sessions,
+    )
 
     app.include_router(ingest.router)
     app.include_router(questions.router)
@@ -74,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(experiences.router)
     app.include_router(resumes.router)
+    app.include_router(review.router)
 
     @app.get("/api/health")
     async def health() -> dict:

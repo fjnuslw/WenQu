@@ -331,3 +331,23 @@ class LLMCall(Base, IntPkMixin):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+class ReviewItem(Base, IntPkMixin, TimestampMixin):
+    """失分点复习队列（F6，SM-2 间隔重复）。评分报告的 weaknesses 自动回流。"""
+
+    __tablename__ = "review_items"
+    __table_args__ = (UniqueConstraint("source_ref", "content_hash"),)
+
+    source: Mapped[str] = mapped_column(String(32), default="interview", nullable=False)
+    source_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 如 session_id
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)  # 失分点对应的题目/知识点
+    weakness: Mapped[str] = mapped_column(Text, nullable=False)  # 失分详情
+    tag: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # SM-2 状态
+    ease: Mapped[float] = mapped_column(Float, default=2.5, nullable=False)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    repetitions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lapses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    due_on: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)

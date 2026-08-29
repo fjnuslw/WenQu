@@ -7,6 +7,7 @@ import {
   Swords,
   UserRoundSearch,
   MessagesSquare,
+  RotateCcw,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/interview", label: "模拟面试", icon: MessagesSquare },
   { href: "/grilling", label: "项目拷打", icon: Swords },
   { href: "/resume", label: "简历工作台", icon: UserRoundSearch },
+  { href: "/review", label: "复习队列", icon: RotateCcw },
 ] as const;
 
 export function AppSidebar() {

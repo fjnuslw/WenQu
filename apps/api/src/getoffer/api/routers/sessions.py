@@ -11,13 +11,13 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from getoffer.api.deps import get_db_session, get_gateway, get_settings
 from getoffer.errors import NotFound
 from getoffer.llm.gateway import LLMGateway
-from getoffer.models import InterviewSession
+from getoffer.models import InterviewSession, ReviewItem
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -98,6 +98,36 @@ async def _upsert_session_row(
     return row
 
 
+async def _ingest_weaknesses(session: AsyncSession, *, session_id: str, report: InterviewReport) -> int:
+    """失分点 → 复习队列（F6）。按会话幂等：该会话已回流过即跳过——重生成报告的 LLM
+    措辞不同，按文本去重挡不住重复回流。"""
+    import hashlib
+
+    already = await session.scalar(
+        select(func.count()).select_from(ReviewItem).where(ReviewItem.source_ref == session_id)
+    )
+    if already:
+        return 0
+
+    added = 0
+    for weakness in report.weaknesses:
+        text = weakness.strip()
+        if len(text) < 6:
+            continue
+        digest = hashlib.sha256(text.lower().encode("utf-8")).hexdigest()
+        session.add(
+            ReviewItem(
+                source="interview",
+                source_ref=session_id,
+                content_hash=digest,
+                question_text=text[:120],
+                weakness=text,
+            )
+        )
+        added += 1
+    return added
+
+
 @router.post("/{session_id}/report")
 async def generate_report(
     session_id: str,
@@ -124,8 +154,14 @@ async def generate_report(
         log_path=log_path,
         report=report,
     )
+    review_added = await _ingest_weaknesses(session, session_id=session_id, report=report)
     await session.commit()
-    return {"session_id": session_id, "mode": row.mode, "report": report.model_dump()}
+    return {
+        "session_id": session_id,
+        "mode": row.mode,
+        "report": report.model_dump(),
+        "review_added": review_added,
+    }
 
 
 @router.get("/{session_id}/report")

@@ -201,9 +201,9 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 |---|---|---|---|
 | **P0 基座** | 三服务脚手架、docker-compose、核心数据模型+Alembic、LLM 网关、设计令牌与 UI 壳、pi 运行时接入、一键启停脚本 | api 启动建表；agents 可开 session 对话；web 壳可导航 | ✅ 2026-08-28（全栈实测：stop/start 幂等循环、健康检查、pi 集成 tsc 零错误） |
 | **K1 知识核心** | F1 导入器（11 源注册+license 门禁）+ 增量导入（source_files 收敛记账）+ LLM 结构化抽取（思考开关/大 max_tokens）+ Meili 索引与全文检索 + F2 题库查询/标签/公司筛选 + **厂商分类管道**（24 厂商种子 + AI 推断标注 + 词表硬校验）+ **算法题接入**（kind=algorithm + "算法"标签族 + LeetCode Hot100 种子，供 I1 面试现场手撕调用） | 题库 ≥3000、面经 ≥500（§3 表格）；导入幂等可增量重跑 | ✅ 2026-08-29 管道全线打通并实测（faq-of-llm-interview 首源 128 文件；其余源经 `scripts/import_source.py --all` 后台持续灌库；厂商标注 AI 推断 freq=1，待面经挖掘校准） |
-| **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官从题库组卷（含 kind=algorithm 手撕抽题）** | 30 分钟模拟面试+报告达 §4 验收 | 🟡 进行中（**闭环已打通**）：组卷 `POST /api/interview/plan`（公司频率榜+track 筛选，50ms）→ agents **题单驱动模式**（队列出题/含糊追问/打满跳题/question 进度事件，5 轮实测 0.8-1.3s/轮）→ 评分报告端到端实测（rubric 五维+原话证据+带标签复习建议）。待做：简历解析押题、报告页 UI、失分点回流 SM-2 |
+| **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官从题库组卷（含 kind=algorithm 手撕抽题）** | 30 分钟模拟面试+报告达 §4 验收 | ✅ 2026-08-29 全链路实测：组卷 v2（公司频率榜 ∪ 简历考点押题 → LLM 定卷硬校验 + 面经追问素材 + 考察简报）→ agents 题单驱动面试（0.8-1.3s/轮，简报/简历要点/probes 首轮导演指令注入）→ 评分报告（rubric 五维+原话证据）→ 失分点自动回流 SM-2（续九）。简历解析管道 + 开始表单简历选择器已上线 |
 | **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | 未开始 |
-| **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | 未开始 |
+| **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | 🟡 进行中：**SM-2 失分点回流已落地**（review_items + /review 页 + 报告自动回流，续九）；待做：掌握度统计、Anki 导出（genanki）、JD 匹配度、Dashboard 完整版 |
 | **P1 公开化** | 多用户、UGC 爆料、语音（LiveKit）、岗位聚合评估 | 按 §10 合规重审 | 未开始 |
 
 **K1 遗留（转入 I1 期间的质量迭代）**：① 存量题标签重打标与 track/厂商回填（进行中：统一分类守护逐批处理，进程见 logs/import-classify.log）；② 厂商标注为 AI 推断（宁缺毋滥 prompt 但通用题易挂大厂），需面经事实对校准频率榜（面经采集器已落地，可从 experiences.items 挖掘公司×题目共现）；③ 导入仍为同步内联执行，超大源建议切 arq 队列（端点语义不变）；④ 牛客/linux.do 采集器——**牛客已落地（续六）**，linux.do 被 Cloudflare 拦截显式失败，待浏览器级方案或人工摘录。
@@ -253,6 +253,12 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
     - agents 消费：PlanQuestion.probes → questionDirective（"来自该公司真实面经，择用改写"）；persona.brief/resumeHighlights → **首轮导演指令注入一次**（之后进入可缓存历史）；开始表单加简历选择器。E2E：简报/要点/probes 全部进入导演指令，面试官正常出题追问。
   - **缓存命中率（turn2 实测 72%）**：`sessionId` 转发 provider（pi cache-aware hook）+ 会话内 append-only 前缀自然命中；关键优化：brief/简历要点原设计放 systemPrompt——**每会话不同 → 杀死跨会话首轮缓存**，已移到首轮导演指令（systemPrompt 只留稳定的公司/岗位/规则头，同 persona 重开面试首轮即可命中）。日志逐轮记录 input/cacheRead/cacheWrite/reasoning，命中率从此可观测。
   - 提交：b91a957（web_search 修复）/ 1e3128b（面试智能体闭环）。
+- **2026-08-29 续九（框架收束：F6 失分点回流 SM-2 + F5 简历工作台 UI，I1 收口）**：
+  - **F6 失分点回流（L1 第一块）**：`review_items` 表（SM-2 全字段：ease/interval/repetitions/lapses/due_on）+ `POST /api/sessions/{id}/report` 自动把 weaknesses 回流为复习条目。幂等语义修正：按**会话**去重（该会话已回流即跳过）——重生成报告的 LLM 措辞不同，文本哈希去重挡不住重复（实测踩坑：同一会话两次生成产出不同措辞的 4+4 条）。`/api/review`：到期清单（due/all）+ `/{id}/grade`（忘了/模糊/掌握 → q=1/3/5 经典 SM-2：q<3 重学+lapse，否则阶梯放大间隔并调 ease）。实测：掌握 → ease 2.5→2.6、间隔 1 天、明天到期。
+  - **复习队列页**（`/review`，侧边栏新入口）：今日待复习/全部切换、逾期徽章、SM-2 参数展示（间隔/ease/第 N 次/遗忘次数）、三键评分（到期视图评分即出队）、来源会话可溯。
+  - **F5 简历工作台 UI**（`/resume`）：PDF 上传（FormData 经同源代理，python-multipart）→ 简历列表 chips → 画像展示（技术栈/考点标签/面试官深挖点/项目要点——要点即 G1 声明底稿）。此前简历只能 curl 上传，闭环入口补齐。
+  - **I1 里程碑收口** ✅：组卷（简历押题×面经追问×频率榜）→ 题单驱动面试 → 评分报告 → 失分点回流 SM-2，全链路一次打通。剩余为质量迭代：报告独立页（当前为面试室内联面板）、30 分钟长面试验收。
+  - 提交：本笔（F6+F5+I1 收口）。
 
 ## 10. 合规与 License 策略
 
