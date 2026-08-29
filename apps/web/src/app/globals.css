@@ -21,26 +21,38 @@
   --color-warn: #fbbf24;
   --color-danger: #f87171;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans SC",
-    "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-sans: "Inter", "Segoe UI Variable Text", "Segoe UI", -apple-system, "PingFang SC",
+    "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 
-  --radius-card: 10px;
+  --radius-card: 12px;
 }
 
 html {
   color-scheme: dark;
+  font-size: 16px;
 }
 
 body {
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
   color: var(--color-ink);
   background:
     radial-gradient(1100px 480px at 85% -12%, rgba(108, 140, 255, 0.09), transparent 62%),
     radial-gradient(900px 420px at -8% 108%, rgba(139, 92, 246, 0.07), transparent 60%),
     var(--color-canvas);
   background-attachment: fixed;
+}
+
+/* 中文字重与字距：标题收紧、正文舒展 */
+h1, h2, h3 {
+  letter-spacing: -0.01em;
+  font-weight: 600;
 }
 
 /* 克制的滚动条（Linear 风） */

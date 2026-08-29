@@ -122,7 +122,7 @@ function CompanyLogo({
   logo: string | null;
   size?: "sm" | "md";
 }) {
-  const box = size === "md" ? "size-11" : "size-4";
+  const box = size === "md" ? "size-14" : "size-4";
   if (logo) {
     return (
       <span className={cn("inline-block overflow-hidden rounded-md bg-white/95 p-0.5", box)}>
@@ -298,18 +298,18 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
       {/* 公司 logo 横条（加大瓷片） */}
       <Card className="p-3">
         <FacetLabel text="按厂商" />
-        <div className="flex gap-2.5 overflow-x-auto pb-1">
+        <div className="flex gap-3 overflow-x-auto pb-1">
           <button
             onClick={() => setCompany("")}
             className={cn(
-              "flex w-[88px] shrink-0 flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition-colors",
+              "flex w-[104px] shrink-0 flex-col items-center gap-2 rounded-xl border px-2.5 py-3 transition-colors",
               company === "" ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong",
             )}
           >
-            <span className="grid size-11 place-items-center rounded-lg bg-surface-2 text-sm font-semibold text-ink-dim">
+            <span className="grid size-14 place-items-center rounded-lg bg-surface-2 text-sm font-semibold text-ink-dim">
               全部
             </span>
-            <span className="text-[11px] text-ink-dim">不限厂商</span>
+            <span className="text-xs text-ink-dim">不限厂商</span>
           </button>
           {companies
             .filter((item) => item.question_count > 0 || item.logo)
@@ -319,13 +319,13 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
                 onClick={() => setCompany((current) => (current === item.name ? "" : item.name))}
                 title={`${item.name} · ${item.question_count} 题`}
                 className={cn(
-                  "flex w-[88px] shrink-0 flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition-colors",
+                  "flex w-[104px] shrink-0 flex-col items-center gap-2 rounded-xl border px-2.5 py-3 transition-colors",
                   company === item.name ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong",
                 )}
               >
                 <CompanyLogo name={item.name} logo={item.logo} />
-                <span className="w-full truncate text-center text-[11px] text-ink-dim">{item.name}</span>
-                <span className="text-[10px] text-ink-faint">{item.question_count} 题</span>
+                <span className="w-full truncate text-center text-xs text-ink-dim">{item.name}</span>
+                <span className="text-[11px] text-ink-faint">{item.question_count} 题</span>
               </button>
             ))}
         </div>
@@ -433,7 +433,7 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
               <Card key={question.id} className="card-hover p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm leading-relaxed text-ink">{question.stem}</p>
+                    <p className="text-[15px] leading-relaxed text-ink">{question.stem}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       {question.track && (
                         <span

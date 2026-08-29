@@ -184,10 +184,20 @@ AGENTS_PROXY_TARGET=http://127.0.0.1:$agentsPort
 Write-Ok "已写 apps\web\.env.local（同源代理指向本次解析的 api/agents 端口）"
 
 if (-not $Dev) {
-    # 生产模式：无构建产物时先构建（路由预编译，页面切换不卡；见 search/前端性能优化调研.md）
+    # 生产模式：构建产物缺失或源码比产物新时自动重建（防"改了代码没生效"）
     $buildId = Join-Path $repoRoot "apps\web\.next\BUILD_ID"
-    if (-not (Test-Path $buildId)) {
-        Write-Step "生产构建（首次约 1-3 分钟，日志 logs\web-build.log）"
+    $needBuild = -not (Test-Path $buildId)
+    if (-not $needBuild -and (Test-Path $buildId)) {
+        $buildTime = (Get-Item $buildId).LastWriteTimeUtc
+        $newestSource = Get-ChildItem (Join-Path $repoRoot "apps\web\src"), (Join-Path $repoRoot "apps\web\next.config.ts"), (Join-Path $repoRoot "apps\web\package.json") -Recurse -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+        if ($newestSource -and $newestSource.LastWriteTimeUtc -gt $buildTime) {
+            Write-Warn2 "检测到 web 源码比构建产物新，自动重建"
+            $needBuild = $true
+        }
+    }
+    if ($needBuild) {
+        Write-Step "生产构建（约 1-3 分钟，日志 logs\web-build.log）"
         $prevEap = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         Push-Location (Join-Path $repoRoot "apps\web")
@@ -201,7 +211,7 @@ if (-not $Dev) {
                 $failures++
             } else { Write-Ok "构建完成" }
         } finally { Pop-Location }
-    } else { Write-Ok "已有构建产物，跳过 build（改动代码后删除 apps\web\.next 可强制重建）" }
+    }
 }
 
 $webProcId = Read-ProcId "web"
