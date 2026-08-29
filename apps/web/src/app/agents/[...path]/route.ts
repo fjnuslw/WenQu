@@ -36,13 +36,20 @@ function proxy(req: Request): Promise<Response> {
           responseHeaders.set(key, Array.isArray(value) ? value.join(", ") : value);
         }
         responseHeaders.set("connection", "close");
-        const chunks: Uint8Array[] = [];
-        upstreamRes.on("data", (chunk: Buffer) => chunks.push(new Uint8Array(chunk)));
-        upstreamRes.on("end", () => {
-          const body = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-          resolve(new Response(new Uint8Array(body), { status: upstreamRes.statusCode ?? 502, headers: responseHeaders }));
+        // 逐块转发（SSE 的生命线）：thinking/text 增量必须实时到达浏览器，
+        // 不能整包缓冲——否则 max 思考的 40s 里用户面对空气泡，计时也会归零。
+        // new Uint8Array(chunk) 显式拷贝：Buffer 是池化 ArrayBuffer 的视图，不能直接引用。
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            upstreamRes.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+            upstreamRes.on("end", () => controller.close());
+            upstreamRes.on("error", (error) => controller.error(error));
+          },
+          cancel() {
+            upstreamRes.destroy();
+          },
         });
-        upstreamRes.on("error", (error) => reject(error));
+        resolve(new Response(body, { status: upstreamRes.statusCode ?? 502, headers: responseHeaders }));
       },
     );
     upstreamReq.on("error", (error) => reject(error));

@@ -2,8 +2,9 @@
 
 import { FileText, SendHorizonal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AssistantMarkdown } from "@/components/assistant/markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,10 @@ import { cn } from "@/lib/utils";
 interface ChatMessage {
   role: "candidate" | "interviewer";
   text: string;
+  /** 思考流全文（thinkingLevel 开启时由 thinking_delta 累积） */
+  thinking: string;
+  /** 思考耗时（秒）：本轮首个 text_delta 到达时结算 */
+  thinkSeconds: number | null;
 }
 
 interface QuestionProgress {
@@ -42,7 +47,11 @@ interface InterviewReport {
  */
 async function consumeTurnStream(
   response: Response,
-  handlers: { onDelta: (delta: string) => void; onEvent: (event: Record<string, unknown>) => void },
+  handlers: {
+    onDelta: (delta: string) => void;
+    onThinkingDelta: (delta: string) => void;
+    onEvent: (event: Record<string, unknown>) => void;
+  },
 ): Promise<void> {
   const body = response.body;
   if (!body) throw new Error("响应无 body，无法流式读取");
@@ -66,6 +75,8 @@ async function consumeTurnStream(
       const parsed = JSON.parse(data) as Record<string, unknown>;
       if (parsed.type === "text_delta" && typeof parsed.delta === "string") {
         handlers.onDelta(parsed.delta);
+      } else if (parsed.type === "thinking_delta" && typeof parsed.delta === "string") {
+        handlers.onThinkingDelta(parsed.delta);
       } else {
         handlers.onEvent(parsed);
       }
@@ -91,6 +102,66 @@ function PhaseStepper({ current }: { current: string }) {
         />
       ))}
     </div>
+  );
+}
+
+function ThinkingTrace({
+  thinking,
+  thinkSeconds,
+  compact = false,
+}: {
+  thinking: string;
+  thinkSeconds: number | null;
+  compact?: boolean;
+}) {
+  return (
+    <details className="group mb-2">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-ink-faint transition-colors hover:text-ink-dim">
+        <span className="inline-block transition-transform group-open:rotate-90">▸</span>
+        已深度思考{thinkSeconds !== null ? `（${thinkSeconds.toFixed(1)}s）` : ""}
+      </summary>
+      <div
+        className={cn(
+          "mt-1.5 whitespace-pre-wrap border-l-2 border-line pl-2.5 leading-relaxed text-ink-faint",
+          compact ? "text-[11px]" : "text-xs",
+        )}
+      >
+        {thinking}
+      </div>
+    </details>
+  );
+}
+
+function ThinkingPanel({
+  text,
+  streaming,
+  seconds,
+}: {
+  text: string;
+  streaming: boolean;
+  seconds: number | null;
+}) {
+  return (
+    <aside className="hidden min-h-0 flex-col rounded-[10px] border border-line bg-surface/60 lg:flex lg:h-full">
+      <header className="flex items-center justify-between border-b border-line px-4 py-3">
+        <span className="text-sm font-medium text-ink">思考过程</span>
+        <Badge variant={streaming ? "accent" : "default"}>
+          {streaming ? "思考中" : seconds !== null ? `${seconds.toFixed(1)}s` : "max 档"}
+        </Badge>
+      </header>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed text-ink-dim">
+        {text ? (
+          <p className="whitespace-pre-wrap">
+            {text}
+            {streaming && <span className="stream-cursor" />}
+          </p>
+        ) : (
+          <p className="text-xs leading-relaxed text-ink-faint">
+            解答时模型以 max 档深度思考，过程会实时显示在这里——像看学长当场想题，帮你理解答题路径而不只是答案。
+          </p>
+        )}
+      </div>
+    </aside>
   );
 }
 
@@ -149,7 +220,9 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [panelIdx, setPanelIdx] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const thinkStartedAtRef = useRef<number | null>(null);
 
   const currentPhase = INTERVIEW_PHASES.find((p) => p.id === phase);
 
@@ -158,13 +231,22 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     if (!isAnswerMode || autoSentRef.current) return;
     autoSentRef.current = true;
-    void send("请结合最新资料解答当前题目，并给出常见的追问方向。");
+    void send("请解答当前题目。");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function scrollToEnd() {
+  // 思考栏默认跟随最新有思考内容的消息；点击气泡可回看历史思考
+  const lastThinkingIdx = (() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role === "interviewer" && messages[index]?.thinking) return index;
+    }
+    return null;
+  })();
+  const panelMessage = messages[panelIdx ?? lastThinkingIdx ?? -1];
+
+  const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
-  }
+  }, []);
 
   async function generateReport() {
     setReportBusy(true);
@@ -181,13 +263,30 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     }
   }
 
+  function settleThinking() {
+    if (thinkStartedAtRef.current === null) return;
+    const seconds = (Date.now() - thinkStartedAtRef.current) / 1000;
+    thinkStartedAtRef.current = null;
+    setMessages((current) => {
+      const next = [...current];
+      const last = next[next.length - 1];
+      if (last?.role === "interviewer" && last.thinkSeconds === null) last.thinkSeconds = seconds;
+      return next;
+    });
+  }
+
   async function send(forcedText?: string) {
     const text = (forcedText ?? draft).trim();
     if (!text || busy) return;
     setBusy(true);
     setError(null);
     if (!forcedText) setDraft("");
-    setMessages((current) => [...current, { role: "candidate", text }, { role: "interviewer", text: "" }]);
+    setPanelIdx(null);
+    setMessages((current) => [
+      ...current,
+      { role: "candidate", text, thinking: "", thinkSeconds: null },
+      { role: "interviewer", text: "", thinking: "", thinkSeconds: null },
+    ]);
     scrollToEnd();
 
     try {
@@ -202,6 +301,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       }
       await consumeTurnStream(response, {
         onDelta: (delta) => {
+          settleThinking(); // 首个正文增量 = 思考结束
           setMessages((current) => {
             const next = [...current];
             const last = next[next.length - 1];
@@ -209,6 +309,15 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
             return next;
           });
           scrollToEnd();
+        },
+        onThinkingDelta: (delta) => {
+          if (thinkStartedAtRef.current === null) thinkStartedAtRef.current = Date.now();
+          setMessages((current) => {
+            const next = [...current];
+            const last = next[next.length - 1];
+            if (last?.role === "interviewer") last.thinking += delta;
+            return next;
+          });
         },
         onEvent: (event) => {
           if (event.type === "phase" && typeof event.phase === "string") setPhase(event.phase);
@@ -224,7 +333,9 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           }
         },
       });
+      settleThinking();
     } catch (caught) {
+      settleThinking();
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setBusy(false);
@@ -232,8 +343,8 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     }
   }
 
-  return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col p-6">
+  const chatColumn = (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">{isAnswerMode ? "答题助手" : "面试室"}</h1>
@@ -265,8 +376,10 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       <div className="flex-1 space-y-4 overflow-y-auto rounded-[10px] border border-line bg-surface/60 p-5">
         {messages.length === 0 && (
           <div className="pt-16 text-center">
-            <p className="text-sm text-ink-dim">{isAnswerMode ? "正在解答当前题目…" : "会话已创建，面试官在等你。"}</p>
-            <p className="mt-1 text-xs text-ink-faint">用一句自我介绍开场，面试官会从题单出第一题。</p>
+            <p className="text-sm text-ink-dim">{isAnswerMode ? "正在深度思考并解答当前题目…" : "会话已创建，面试官在等你。"}</p>
+            <p className="mt-1 text-xs text-ink-faint">
+              {isAnswerMode ? "思考过程会在右侧栏实时展示。" : "用一句自我介绍开场，面试官会从题单出第一题。"}
+            </p>
           </div>
         )}
         {messages.map((message, index) =>
@@ -277,12 +390,21 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
               </div>
             </div>
           ) : (
-            <div key={index} className="bubble-in mr-auto flex max-w-[85%] items-start gap-2.5">
+            <div
+              key={index}
+              className="bubble-in mr-auto flex max-w-[92%] items-start gap-2.5"
+              onClick={message.thinking ? () => setPanelIdx(index) : undefined}
+            >
               <span className="brand-tile mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-[11px] font-semibold text-white">
                 {isAnswerMode ? "助" : "考"}
               </span>
-              <div className="rounded-xl rounded-tl-sm bg-surface-2 px-4 py-2.5 text-sm leading-relaxed text-ink">
-                {message.text || (busy ? <span className="stream-cursor" /> : "")}
+              <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-surface-2 px-4 py-3 text-sm leading-relaxed text-ink">
+                {message.thinking && <ThinkingTrace thinking={message.thinking} thinkSeconds={message.thinkSeconds} />}
+                {message.text ? (
+                  <AssistantMarkdown text={message.text} streaming={busy && index === messages.length - 1} />
+                ) : (
+                  busy && <span className="stream-cursor" />
+                )}
               </div>
             </div>
           ),
@@ -298,7 +420,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
         <div className="flex gap-2">
           <Input
             className="h-10"
-            placeholder="输入你的回答…"
+            placeholder={isAnswerMode ? "继续追问…" : "输入你的回答…"}
             value={draft}
             disabled={busy}
             onChange={(event) => setDraft(event.target.value)}
@@ -309,21 +431,47 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           <Button className="h-10 px-4" onClick={() => void send()} disabled={busy || draft.trim().length === 0}>
             <SendHorizonal className="size-4" />
           </Button>
-          <Button
-            variant="secondary"
-            className="h-10"
-            onClick={() => void generateReport()}
-            disabled={reportBusy || report !== null}
-            title={report ? "报告已生成" : "对本场面试生成评分报告"}
-          >
-            <FileText className="size-4" />
-            {reportBusy ? "生成中…" : "评分报告"}
-          </Button>
+          {!isAnswerMode && (
+            <Button
+              variant="secondary"
+              className="h-10"
+              onClick={() => void generateReport()}
+              disabled={reportBusy || report !== null}
+              title={report ? "报告已生成" : "对本场面试生成评分报告"}
+            >
+              <FileText className="size-4" />
+              {reportBusy ? "生成中…" : "评分报告"}
+            </Button>
+          )}
         </div>
         <p className="mt-2 text-center text-[11px] text-ink-faint">
-          <span className="kbd">Enter</span> 发送 · 阶段推进与追问深度由确定性状态机控制 · 评分报告经 api 侧 LLM 生成
+          <span className="kbd">Enter</span> 发送 · {isAnswerMode ? "max 档深度思考 + 联网核实" : "阶段推进与追问深度由确定性状态机控制"} · 支持完整 markdown/公式渲染
         </p>
       </div>
+    </div>
+  );
+
+  return (
+    <div
+      className={cn(
+        "mx-auto flex h-full flex-col gap-4 p-6",
+        isAnswerMode ? "max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5" : "max-w-3xl",
+      )}
+    >
+      {chatColumn}
+      {isAnswerMode && (
+        <ThinkingPanel
+          text={panelMessage?.role === "interviewer" ? (panelMessage.thinking ?? "") : ""}
+          streaming={
+            busy &&
+            panelIdx === null &&
+            panelMessage?.role === "interviewer" &&
+            panelMessage.thinking.length > 0 &&
+            panelMessage.text.length === 0
+          }
+          seconds={panelMessage?.role === "interviewer" ? (panelMessage.thinkSeconds ?? null) : null}
+        />
+      )}
     </div>
   );
 }

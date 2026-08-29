@@ -128,3 +128,87 @@ h1, h2, h3 {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ---- LLM 输出 markdown（assistant-markdown，streamdown 渲染容器） ---- */
+.assistant-markdown > :first-child { margin-top: 0; }
+.assistant-markdown > :last-child { margin-bottom: 0; }
+.assistant-markdown h1,
+.assistant-markdown h2,
+.assistant-markdown h3,
+.assistant-markdown h4 {
+  color: var(--color-ink);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.1em 0 0.45em;
+  line-height: 1.35;
+}
+.assistant-markdown h1 { font-size: 1.2em; }
+.assistant-markdown h2 { font-size: 1.12em; }
+.assistant-markdown h3 { font-size: 1.05em; }
+.assistant-markdown h4 { font-size: 1em; }
+.assistant-markdown p { margin: 0.55em 0; }
+.assistant-markdown ul,
+.assistant-markdown ol { margin: 0.55em 0; padding-left: 1.4em; }
+.assistant-markdown ul { list-style: disc; }
+.assistant-markdown ol { list-style: decimal; }
+.assistant-markdown li { margin: 0.25em 0; }
+.assistant-markdown li > ul,
+.assistant-markdown li > ol { margin: 0.2em 0; }
+.assistant-markdown strong { color: var(--color-ink); font-weight: 600; }
+.assistant-markdown a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.assistant-markdown blockquote {
+  margin: 0.6em 0;
+  padding: 0.1em 0 0.1em 0.9em;
+  border-left: 3px solid var(--color-line-strong);
+  color: var(--color-ink-dim);
+}
+.assistant-markdown code:not(pre code) {
+  padding: 0.12em 0.4em;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-2));
+  border: 1px solid var(--color-line);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: #b8c4ff;
+}
+.assistant-markdown pre {
+  margin: 0.65em 0;
+  padding: 0.85em 1em;
+  border-radius: 9px;
+  border: 1px solid var(--color-line);
+  overflow-x: auto;
+  background: #0d0f13;
+}
+.assistant-markdown pre code {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  line-height: 1.55;
+}
+.assistant-markdown table {
+  margin: 0.7em 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  display: block;
+  overflow-x: auto;
+}
+.assistant-markdown th,
+.assistant-markdown td {
+  border: 1px solid var(--color-line);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+.assistant-markdown th { background: var(--color-surface-2); font-weight: 600; }
+.assistant-markdown hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid var(--color-line);
+}
+/* KaTeX：行内与显示公式在窄栏的溢出处理 */
+.assistant-markdown .katex { font-size: 1.02em; }
+.assistant-markdown .katex-display {
+  margin: 0.7em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+}

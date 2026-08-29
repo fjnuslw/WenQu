@@ -9,12 +9,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@streamdown/code": "^1.1.1",
+    "@streamdown/math": "^1.0.2",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "lucide-react": "1.35.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "streamdown": "^2.6.0",
     "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
