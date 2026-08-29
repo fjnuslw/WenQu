@@ -56,6 +56,12 @@ class Settings(BaseSettings):
         return self.data_dir / "repos"
 
     @property
+    def uploads_dir(self) -> Path:
+        uploads = self.data_dir / "uploads"
+        uploads.mkdir(parents=True, exist_ok=True)
+        return uploads
+
+    @property
     def sessions_dir(self) -> Path:
         return self.data_dir / "sessions"
 

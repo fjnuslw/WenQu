@@ -63,12 +63,11 @@ export function systemPrompt(config: SessionConfig): string {
   const style = persona.style ?? "礼貌但穷追：先肯定合理的部分，再追问含糊的部分";
   const company = persona.company ? `${persona.company} 的` : "";
   const jd = persona.jd ? `\n目标岗位 JD：\n${persona.jd}` : "";
-  const highlights = persona.resumeHighlights?.length
-    ? `\n候选人简历要点：\n${persona.resumeHighlights.map((line) => `- ${line}`).join("\n")}`
-    : "";
+  // brief 与 resumeHighlights 不放 systemPrompt：它们每个会话都不同，会杀死
+  // DeepSeek 前缀缓存的跨会话首轮命中。首轮经导演指令注入，之后进入可缓存的历史前缀。
   return [
     `你是${company}大模型应用/Agent 开发岗面试官，正在面试「${persona.role}」候选人。追问风格：${style}。`,
-    jd + highlights,
+    jd,
     "",
     "通用规则：",
     "1. 每轮只问一个问题；问题要具体到实现层或决策层，不接受泛泛而谈。",
@@ -76,10 +75,21 @@ export function systemPrompt(config: SessionConfig): string {
     ...HINT_LADDER.map((line, index) => `   ${index + 1}. ${line}`),
     `   追问深度上限 ${config.maxFollowUpDepth} 层；打满即标记盲区换题。`,
     "3. 候选人说'忘了/不确定'时降一级难度重问一次，再不会就记录并继续。",
-    "4. 禁止编造候选人简历或项目里的内容；引用只能基于候选人本轮发言。",
+    "4. 禁止编造候选人简历或项目里的内容；引用只能基于候选人本轮发言或已注入的简历要点。",
     "5. 语气专业克制，不闲聊，不奉承；单轮回复控制在 150 字以内。",
     "6. 每轮开头的[导演指令]是系统控制信号，对候选人不复述、不解释。",
   ].join("\n");
+}
+
+/** 首轮注入的会话上下文（简报 + 简历要点）：进历史而非 systemPrompt，保住前缀缓存。 */
+export function firstTurnContextDirective(persona: { brief?: string; resumeHighlights?: string[] }): string | null {
+  const parts: string[] = [];
+  if (persona.brief) parts.push(`本场考察简报（组卷官生成，指导出题与追问重点，不念给候选人）：${persona.brief}`);
+  if (persona.resumeHighlights?.length) {
+    parts.push(`候选人简历要点（供押题追问，不编造）：\n${persona.resumeHighlights.map((line) => `- ${line}`).join("\n")}`);
+  }
+  if (parts.length === 0) return null;
+  return `[导演指令·会话上下文] ${parts.join("\n")}`;
 }
 
 /** 每轮注入的阶段上下文。 */

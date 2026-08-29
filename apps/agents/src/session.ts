@@ -16,7 +16,12 @@ import type { AgentServiceConfig } from "./config.js";
 import type { PiRuntime } from "./pi.js";
 import { webSearchTool } from "./tools/web-search.js";
 import { initialState, nextPhase, onFollowUp, onQuestionCompleted, shouldAdvance } from "./state-machine.js";
-import { followUpDirective, phaseDirective, systemPrompt } from "./prompts.js";
+import {
+  firstTurnContextDirective,
+  followUpDirective,
+  phaseDirective,
+  systemPrompt,
+} from "./prompts.js";
 import type { ClientEvent, PhaseState, PlanQuestion, SessionConfig, TurnOutcome } from "./types.js";
 
 interface RunningSession {
@@ -31,6 +36,8 @@ interface RunningSession {
   streamBuf: string;
   /** 本轮思考流累积（thinkingLevel 开启时的 reasoning_content 增量） */
   thinkBuf: string;
+  /** 会话上下文（简报/简历要点）只随首轮注入一次：之后进入可缓存的历史前缀 */
+  contextInjected: boolean;
   /** 当前轮次的 SSE 下沉点（turn 期间有效） */
   sink: ((event: ClientEvent) => void) | null;
   logPath: string;
@@ -90,11 +97,19 @@ function phaseForKind(kind: string): PhaseState["phase"] {
 
 function questionDirective(index: number, total: number, q: PlanQuestion): string {
   const answer = q.answer ?? "（无参考要点，按你的知识判断回答质量）";
+  const probes = q.probes?.length
+    ? `\n追问素材（来自该公司真实面经，提问后择用——改写成你的追问，不相关就不用）：\n${q.probes
+        .map((probe) => `- ${probe}`)
+        .join("\n")}`
+    : "";
   return [
     `[导演指令] 现在提出题单第 ${index}/${total} 题。`,
     `题干：${q.stem}`,
     `参考答案要点（仅供你判断回答质量与追问方向，切勿直接念给候选人）：${answer}`,
-  ].join("\n");
+    probes,
+  ]
+    .filter((part) => part !== "")
+    .join("\n");
 }
 
 export class SessionManager {
@@ -116,6 +131,7 @@ export class SessionManager {
       systemPrompt(config),
       config.mode === "answer" ? [webSearchTool] : undefined,
       thinkingLevel,
+      id,
     );
     const questions = config.questions ?? [];
     const session: RunningSession = {
@@ -129,6 +145,7 @@ export class SessionManager {
       qIndex: 0,
       streamBuf: "",
       thinkBuf: "",
+      contextInjected: false,
     };
     agent.subscribe((event: unknown) => this.onAgentEvent(session, event));
     this.sessions.set(id, session);
@@ -154,6 +171,13 @@ export class SessionManager {
 
     const directives: string[] = [];
     let phaseAdvanced = false;
+
+    // 首轮注入简报/简历要点（仅一次，随后进入可缓存前缀——跨会话缓存的取舍见 prompts.ts）
+    if (!session.contextInjected) {
+      session.contextInjected = true;
+      const contextDirective = firstTurnContextDirective(session.config.persona);
+      if (contextDirective) directives.push(contextDirective);
+    }
 
     if (session.questions.length > 0) {
       // ---- 题单驱动模式：队列出题，阶段预算不生效 ----

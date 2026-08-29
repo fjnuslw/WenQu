@@ -1,7 +1,11 @@
-"""模拟面试组卷 API（F3 · I1）：按公司/岗位大类/题型从题库抽题生成面试题单。
+"""模拟面试组卷 API（F3 · I1）：检索增强的确定性组卷。
 
-有公司筛选时按该公司出题频率降序（CodeTop 范式），否则随机；题单含参考答案要点，
-供面试官 agent 判断回答质量（不直接展示给候选人）。
+设计原则（spec §4 F3 / D5）：
+- 检索与组卷在 api 侧完成（候选池=公司频率榜 ∪ 简历考点标签命中；追问素材=该公司真实面经的
+  追问链），LLM 只做"从候选池选 id + 分配追问素材 + 写简报"——id 越池即丢弃，不足按频率榜
+  确定性补齐。面试官 agent（apps/agents）保持题单驱动，不自由出题，保证收敛。
+- 简历画像（resumes.parsed）提供 exam_tags/highlights；面经追问来自 experience_items 的
+  子节点（parent_id 非空即真实追问）。
 """
 
 from random import sample
@@ -13,9 +17,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from getoffer.api.deps import get_db_session
+from getoffer.api.deps import get_db_session, get_gateway
 from getoffer.errors import NotFound
-from getoffer.models import Company, Question, QuestionCompany
+from getoffer.llm.gateway import LLMGateway
+from getoffer.models import Company, Experience, ExperienceItem, Question, QuestionCompany, Resume, Tag
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
@@ -25,6 +30,8 @@ _EAGER = (
 )
 
 DEFAULT_KINDS = ["knowledge", "handwritten_code", "algorithm", "scenario"]
+POOL_LIMIT = 40  # 候选池上限（LLM 定卷的输入预算）
+PROBE_POOL_LIMIT = 40  # 追问素材池上限
 
 
 class InterviewPlanRequest(BaseModel):
@@ -32,6 +39,7 @@ class InterviewPlanRequest(BaseModel):
     track: str | None = None
     kinds: list[str] = Field(default_factory=lambda: list(DEFAULT_KINDS), max_length=5)
     size: int = Field(default=8, ge=3, le=20)
+    resume_id: int | None = None
 
 
 class PlanQuestion(BaseModel):
@@ -43,17 +51,64 @@ class PlanQuestion(BaseModel):
     answer: str | None
     tags: list[str]
     companies: list[str]
+    probes: list[str] = Field(default_factory=list, max_length=3)
 
 
-class InterviewPlan(BaseModel):
-    total_pool: int
-    questions: list[PlanQuestion]
+class ProbeAssignment(BaseModel):
+    question_id: int
+    probes: list[str] = Field(default_factory=list, max_length=3)
+
+
+class ComposedPlan(BaseModel):
+    """LLM 定卷输出：只能从候选池选 id（越池硬校验丢弃）。"""
+
+    question_ids: list[int] = Field(max_length=20)
+    probe_assignments: list[ProbeAssignment] = Field(default_factory=list, max_length=20)
+    brief: str = Field(default="", max_length=800)
+
+
+def _compose_system_prompt() -> str:
+    return (
+        "你是大模型岗位的面试组卷官。输入：候选人简历画像、候选题目池（id/stem/类型/标签/难度/答案要点）、"
+        "该公司真实面经的追问素材池。任务三件事：\n"
+        "1. 定卷：从候选题目池中选出指定数量的题目，输出池内 id 原文（不得编造 id）。\n"
+        "   配比：约一半选与候选人技术栈/项目考点对应的题（押题），其余覆盖该公司高频题；\n"
+        "   若池中有 scenario（场景设计）或 handwritten_code（手撕）题，至少各含 1 道。\n"
+        "2. 分配追问：为每道题从追问素材池挑 0-2 条与该题知识相关的真实追问（宁缺毋滥，不相关不给）。\n"
+        "3. 写简报 brief：2-3 句候选人画像与本场考察重点，给面试官看，不念给候选人。\n"
+        "输出严格按 Schema；brief 用中文。"
+    )
+
+
+async def _load_resume_profile(session: AsyncSession, resume_id: int) -> dict[str, Any]:
+    row = await session.get(Resume, resume_id)
+    if row is None:
+        raise NotFound(f"简历不存在: {resume_id}")
+    parsed = row.parsed or {}
+    if not parsed:
+        raise NotFound(f"简历 {resume_id} 缺少解析画像（parsed 为空），请重新上传")
+    return parsed
+
+
+async def _company_probe_pool(session: AsyncSession, company_id: int) -> list[str]:
+    """该公司真实面经的追问链（experience_items 子节点），去重截断。"""
+    rows = (
+        await session.scalars(
+            select(ExperienceItem.question_text)
+            .join(Experience, Experience.id == ExperienceItem.experience_id)
+            .where(Experience.company_id == company_id, ExperienceItem.parent_id.is_not(None))
+            .group_by(ExperienceItem.question_text)
+            .limit(PROBE_POOL_LIMIT)
+        )
+    ).all()
+    return [text for text in rows if text and len(text) >= 6]
 
 
 @router.post("/plan")
 async def create_plan(
     request: InterviewPlanRequest,
     session: AsyncSession = Depends(get_db_session),
+    gateway: LLMGateway = Depends(get_gateway),
 ) -> dict[str, Any]:
     conditions = []
     if request.kinds:
@@ -87,12 +142,94 @@ async def create_plan(
         stmt = stmt.order_by(func.random())
 
     pool_total = await session.scalar(select(func.count()).select_from(Question).where(*conditions))
-    limit = min(request.size * 3, 120)  # 先取候选池，再随机抽样到目标题数
-    rows = (await session.scalars(stmt.limit(limit))).unique().all()
-    picked = sample(rows, min(request.size, len(rows))) if rows else []
+    rows = (await session.scalars(stmt.limit(POOL_LIMIT))).unique().all()
+
+    # 简历画像：exam_tags 命中的题并入候选池（与频率榜求并，去重）
+    resume_profile: dict[str, Any] | None = None
+    if request.resume_id is not None:
+        resume_profile = await _load_resume_profile(session, request.resume_id)
+        exam_tags = [str(tag) for tag in resume_profile.get("exam_tags") or []]
+        if exam_tags:
+            tagged_rows = (
+                (
+                    await session.scalars(
+                        select(Question)
+                        .join(Question.tags)
+                        .where(Tag.name.in_(exam_tags))
+                        .options(*_EAGER)
+                        .order_by(func.random())
+                        .limit(20)
+                    )
+                )
+                .unique()
+                .all()
+            )
+            seen_ids = {q.id for q in rows}
+            rows = list(rows) + [q for q in tagged_rows if q.id not in seen_ids]
+
+    picked: list[Question] = []
+    probe_map: dict[int, list[str]] = {}
+    brief = ""
+
+    if resume_profile is not None and rows:
+        # LLM 定卷：选 id + 分配追问 + 简报（id 越池丢弃，不足按序补齐）
+        probe_pool = await _company_probe_pool(session, company.id) if company is not None else []
+        candidates_text = "\n\n".join(
+            f"id={q.id} [{q.kind}] 标签:{','.join(t.name for t in q.tags) or '无'} 难度:{q.difficulty}\n"
+            f"题干:{q.stem[:150]}\n答案要点:{(q.answer or '无')[:160]}"
+            for q in rows
+        )
+        probes_text = "\n".join(f"- {probe}" for probe in probe_pool) or "（该公司暂无面经追问素材）"
+        highlights = resume_profile.get("highlights") or []
+        tech_stack = resume_profile.get("tech_stack") or []
+        profile_text = (
+            f"求职方向：{resume_profile.get('role_target') or '未标注'}\n"
+            f"技术栈：{'、'.join(str(s) for s in tech_stack[:15]) or '未提取'}\n"
+            f"深挖点：{'；'.join(str(h) for h in highlights[:6]) or '未提取'}"
+        )
+        composed = await gateway.complete_structured(
+            [
+                {
+                    "role": "user",
+                    "content": (
+                        f"## 候选人画像\n{profile_text}\n\n"
+                        f"## 目标数量\n{request.size} 道\n\n"
+                        f"## 候选题目池（共 {len(rows)} 道）\n{candidates_text}\n\n"
+                        f"## 该公司面经追问素材池\n{probes_text}"
+                    ),
+                }
+            ],
+            ComposedPlan,
+            system=_compose_system_prompt(),
+            purpose="interview.compose_plan",
+        )
+        by_id = {q.id: q for q in rows}
+        valid_ids = [qid for qid in composed.question_ids if qid in by_id]
+        seen: set[int] = set()
+        for qid in valid_ids:
+            if qid not in seen:
+                seen.add(qid)
+                picked.append(by_id[qid])
+        # 不足按原序（频率榜序）确定性补齐——显式行为，不是静默降级
+        for q in rows:
+            if len(picked) >= request.size:
+                break
+            if q.id not in seen:
+                seen.add(q.id)
+                picked.append(q)
+        assignment_map = {a.question_id: a.probes for a in composed.probe_assignments}
+        for q in picked:
+            probes = [str(p) for p in assignment_map.get(q.id, []) if str(p).strip()]
+            if probes:
+                probe_map[q.id] = probes[:3]
+        brief = composed.brief.strip()
+    else:
+        picked = sample(rows, min(request.size, len(rows))) if rows else []
 
     return {
         "total_pool": pool_total or 0,
+        "brief": brief,
+        "resume_used": resume_profile is not None,
         "questions": [
             {
                 "id": q.id,
@@ -103,6 +240,7 @@ async def create_plan(
                 "answer": q.answer,
                 "tags": [t.name for t in q.tags],
                 "companies": [c.company.name for c in q.company_stats],
+                "probes": probe_map.get(q.id, []),
             }
             for q in picked
         ],

@@ -19,7 +19,9 @@ export interface PersonaConfig {
   style?: string;
   /** 目标 JD 原文（可选） */
   jd?: string;
-  /** 候选人简历要点（可选，I1 阶段由 api 押题注入） */
+  /** api 组卷官生成的本场考察简报（画像+考察重点，给面试官不念给候选人） */
+  brief?: string;
+  /** 候选人简历要点（I1：api 简历解析管道产出） */
   resumeHighlights?: string[];
 }
 
@@ -29,6 +31,8 @@ export interface PlanQuestion {
   stem: string;
   kind: string;
   answer: string | null;
+  /** 该公司真实面经的追问素材（api 从 experience_items 检索，面试官择用） */
+  probes?: string[];
 }
 
 export interface SessionConfig {

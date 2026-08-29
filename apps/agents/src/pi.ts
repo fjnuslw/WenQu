@@ -54,8 +54,14 @@ function buildDeepSeekProvider(): Provider<"openai-completions"> {
 }
 
 export interface PiRuntime {
-  /** thinkingLevel 缺省用全局配置；可按会话模式降档（面试官短回复不需要 max 思考的开销） */
-  agentFactory: (systemPrompt: string, tools?: AgentTool[], thinkingLevel?: AgentServiceConfig["thinkingLevel"]) => Agent;
+  /** thinkingLevel 缺省用全局配置；可按会话模式降档（面试官短回复不需要 max 思考的开销）。
+   * sessionId 转发给 provider（cache-aware backends），配合 DeepSeek 前缀缓存提高命中。 */
+  agentFactory: (
+    systemPrompt: string,
+    tools?: AgentTool[],
+    thinkingLevel?: AgentServiceConfig["thinkingLevel"],
+    sessionId?: string,
+  ) => Agent;
 }
 
 export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
@@ -69,7 +75,7 @@ export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
     throw new Error(`模型 ${model.id} 目录条目未标记 reasoning，无法开启思考流（显式失败而非静默降级）`);
   }
   return {
-    agentFactory: (systemPrompt, tools, thinkingLevel) =>
+    agentFactory: (systemPrompt, tools, thinkingLevel, sessionId) =>
       new Agent({
         initialState: {
           systemPrompt,
@@ -78,6 +84,7 @@ export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
           ...(tools ? { tools } : {}),
         },
         streamFn: models.streamSimple.bind(models),
+        ...(sessionId ? { sessionId } : {}),
       }),
   };
 }

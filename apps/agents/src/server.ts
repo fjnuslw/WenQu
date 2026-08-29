@@ -20,6 +20,7 @@ const personaSchema = z.object({
   role: z.string().min(1),
   style: z.string().optional(),
   jd: z.string().optional(),
+  brief: z.string().optional(),
   resumeHighlights: z.array(z.string()).optional(),
 });
 
@@ -39,6 +40,7 @@ const createSchema = z.object({
           .nullable()
           .optional()
           .transform((value) => value ?? null),
+        probes: z.array(z.string().min(1)).max(3).optional(),
       }),
     )
     .max(20)
