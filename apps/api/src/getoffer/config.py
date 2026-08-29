@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:26379/0"
     # git 克隆代理（如 http://127.0.0.1:7897）；空 = 直连
     git_proxy: str = ""
+    # 面经采集渠道的 HTTP 代理（本机直连失效时配置，如 Clash 混合端口）；空 = 直连
+    collect_proxy: str = ""
     data_dir: Path = DATA_ROOT
 
     # 开发期便利（建表交给 SQLAlchemy）；正式迁移走 alembic，见 README

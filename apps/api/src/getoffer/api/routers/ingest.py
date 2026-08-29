@@ -73,6 +73,33 @@ async def run_import(
     }
 
 
+@router.post("/collect/{slug}")
+async def collect_channel(
+    slug: str,
+    max_posts: int = 8,
+    session: AsyncSession = Depends(get_db_session),
+    gateway=Depends(get_gateway),
+    settings=Depends(get_settings),
+) -> dict:
+    """渠道面经采集（F1 后半：牛客/linux.do → LLM 结构化 → experiences 幂等入库）。
+
+    内联执行（与导入一致，换 arq 队列时端点语义不变）；低频限速在 PoliteClient 内强制，
+    max_posts 越大耗时越长（每帖一次 LLM 抽取 + 渠道请求间隔）。
+    """
+    from getoffer.ingest.collect.runner import collect_channel as run_collect
+
+    bounded = max(1, min(max_posts, 30))
+    report = await run_collect(slug, session=session, gateway=gateway, settings=settings, max_posts=bounded)
+    return {
+        "channel": report.channel,
+        "posts_seen": report.posts_seen,
+        "duplicates": report.duplicates,
+        "skipped_non_experience": report.skipped_non_experience,
+        "inserted": report.inserted,
+        "unmatched_companies": report.unmatched_companies,
+    }
+
+
 @router.post("/reindex")
 async def reindex(
     session: AsyncSession = Depends(get_db_session),

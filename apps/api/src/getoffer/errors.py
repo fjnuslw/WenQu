@@ -38,6 +38,13 @@ class LicenseViolation(AppError):
     code = "license_violation"
 
 
+class ComplianceViolation(AppError):
+    """采集合规闸门（robots/公开范围）：我们主动拒绝而非绕过（spec §10）。"""
+
+    http_status = 400
+    code = "compliance_violation"
+
+
 class NotConfigured(AppError):
     """依赖的外部配置缺失（如 LLM key）。启动可用、调用即失败，显式而非兜底。"""
 
