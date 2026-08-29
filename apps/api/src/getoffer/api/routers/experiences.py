@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/experiences", tags=["experiences"])
 
 _EAGER = (
     selectinload(Experience.company),
+    selectinload(Experience.source),
     selectinload(Experience.items),
 )
 
@@ -23,6 +24,9 @@ def _experience_out(experience: Experience) -> dict[str, Any]:
     return {
         "id": experience.id,
         "company": experience.company.name if experience.company else None,
+        "company_logo": experience.company.logo if experience.company else None,
+        "source_slug": experience.source.slug if experience.source else None,
+        "source_name": experience.source.name if experience.source else None,
         "role": experience.role,
         "round": experience.round,
         "occurred_on": experience.occurred_on.isoformat() if experience.occurred_on else None,

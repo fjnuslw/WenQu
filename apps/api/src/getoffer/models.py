@@ -165,6 +165,7 @@ class Experience(Base, IntPkMixin, TimestampMixin):
     content_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
 
     company: Mapped[Company | None] = relationship()
+    source: Mapped["Source | None"] = relationship()
     items: Mapped[list["ExperienceItem"]] = relationship(
         back_populates="experience", cascade="all, delete-orphan", order_by="ExperienceItem.order_no"
     )
