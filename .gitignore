@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.next/
+out/
+
+# 运行时数据与密钥
+data/
+logs/
+.env
+.env.*
+*.local
+
+# 调研复用源码（各为独立 git 仓库，仅本地学习用，不随本项目提交）
+references/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# ZCode 本地工件
+.zcode/

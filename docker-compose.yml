@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: getoffer
+      POSTGRES_PASSWORD: getoffer
+      POSTGRES_DB: getoffer
+    ports:
+      - "24432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U getoffer -d getoffer"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      MEILI_MASTER_KEY: getoffer_dev_master_key_change_me_32
+      MEILI_ENV: development
+    ports:
+      - "27700:7700"
+    volumes:
+      - meili_data:/meili_data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "26379:6379"
+
+volumes:
+  pgdata:
+  meili_data:

@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/*
+ * 设计令牌（spec §6）：Linear 式暗色优先，单一来源。
+ * 工具类自动生成：bg-canvas / bg-surface / border-line / text-ink / text-ink-dim / text-accent ...
+ */
+@theme {
+  --color-canvas: #0b0c0e;
+  --color-surface: #101114;
+  --color-surface-2: #16181c;
+  --color-line: #23262c;
+  --color-line-strong: #2f333b;
+  --color-ink: #e6e8eb;
+  --color-ink-dim: #9aa0a8;
+  --color-ink-faint: #62676f;
+  --color-accent: #6c8cff;
+  --color-accent-strong: #4f6ef7;
+  --color-accent-violet: #8b5cf6;
+  --color-accent-soft: #161d38;
+  --color-ok: #4ade80;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans SC",
+    "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+
+  --radius-card: 10px;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  color: var(--color-ink);
+  background:
+    radial-gradient(1100px 480px at 85% -12%, rgba(108, 140, 255, 0.09), transparent 62%),
+    radial-gradient(900px 420px at -8% 108%, rgba(139, 92, 246, 0.07), transparent 60%),
+    var(--color-canvas);
+  background-attachment: fixed;
+}
+
+/* 克制的滚动条（Linear 风） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: rgba(108, 140, 255, 0.28);
+  color: var(--color-ink);
+}
+
+/* ---- 组件级质感（纯 CSS，避免 @apply 兼容性问题） ---- */
+
+/* 卡片悬浮：边框提亮 + 轻微上浮 + 投影 */
+.card-hover {
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+.card-hover:hover {
+  border-color: var(--color-line-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* 品牌渐变块 */
+.brand-tile {
+  background: linear-gradient(135deg, var(--color-accent-strong) 0%, var(--color-accent-violet) 100%);
+  box-shadow: 0 2px 10px rgba(79, 110, 247, 0.35);
+}
+
+/* 流式输出光标 */
+.stream-cursor::after {
+  content: "▍";
+  margin-left: 1px;
+  color: var(--color-accent);
+  animation: cursor-blink 1s steps(2) infinite;
+}
+@keyframes cursor-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* 键位提示 */
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--color-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--color-surface-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-dim);
+}
+
+/* 消息气泡进入动画（克制） */
+.bubble-in {
+  animation: bubble-in 180ms ease-out;
+}
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
