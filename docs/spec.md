@@ -266,6 +266,11 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **E2E（用 WenQu 自身仓库做被拷打项目，127 文件/268KB）**：备课 95s 产出 16 模块（连本项目的 SSE 无心跳、会话无过期清理、prompt 无防注入全被抓为缺失质询题）；声明对照把简历 IN-Retriever 全部声明正确判 not_found 并生成"你说的 X 在哪"质证问题——**注水识别价值主张成立**。拷打两轮实测：先核对候选人回答与 queue.ts 一致 → 主动读 session.ts:183 发现无 AbortSignal → 质询"客户端断连后 LLM 继续跑事件堆积，清理机制呢"——查证式深挖（怎么实现的→边界→缺失）完整成立。缓存：turn2 cacheRead=9088。
   - **web**：/grilling 页（项目名+对照简历+zip→备课报告：总览/声明质证清单/模块拷打弹药→开始拷打）；ChatRoom grill 模式（"拷"头像/思考栏/回答拷打官占位）。
   - v1 取舍（research/06 §3）：tree-sitter repo map、pgvector 语义检索、git 归属分析 → v2（zip 无 git 历史；子串检索对中等仓库够用，Anthropic 立场支持 agentic search）；评分报告复用 I1（JSONL 同构）。已知缺口：会话历史回显（ChatRoom 客户端态不拉历史）、备课内联执行（大仓库 1-3 分钟，切 arq 时语义不变）、/grilling 页未接已备课项目列表。
+- **2026-08-29 续十一（G1 体验收口：本地目录接入 + 简历替换 + /api 代理 30s 断连根治，用户反馈驱动）**：
+  - **本地目录原位备课（dsh 式）**：`local_path` 表单字段（绝对路径）→ 服务端**原位读取零拷贝**（repo_path 即原目录，不再解压进 data/projects），项目名自动取目录名；本地部署形态下最自然的接入方式。zip 上传保留为辅助通道。E2E：`apps/agents` 目录 → 16 文件/10 模块/12 声明对照，95s。
+  - **/api 代理 30s 断连根治**：长 POST（备课 95s）经 next.config rewrites 的 undici fetch 在 ~30s 被 ECONNRESET（web.err.log 实锤；此前"扩采 500"与"备课 500"同因，此前误判为重启撞车）——**/api 弃用 rewrites，改走与 /agents 同构的 node:http Route Handler**（app/api/[...path]/route.ts，keepAlive:false + 逐块转发），95s 长备课经代理实测全程 200。
+  - **简历替换与隐私**：DELETE /api/resumes/{id}（行+声明+本地 PDF 文件）；/resume 页 chips 带 × 删除，"替换 = 删除后重新上传"；页头明示"文件只存本地 data/uploads（已 gitignore）"。**隐私核查：data/ 全目录在 .gitignore、git 零跟踪 PDF——用户简历从未进过 GitHub**。
+  - **/grilling UI**：双模式 tab（本地目录推荐 / zip 辅助）、项目名可留空自动推导（修复"上传按钮莫名置灰"：此前要求先填项目名）、备课进度文案、repo_root 展示。
 
 ## 10. 合规与 License 策略
 
