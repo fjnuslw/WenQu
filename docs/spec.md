@@ -245,6 +245,14 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **可观测性**：每轮 usage（input/output/cacheRead/cacheWrite/reasoning）入会话 JSONL——token 开销与缓存命中从此有数（首轮 cacheRead=0 正常，追问轮可验证 DeepSeek 前缀缓存命中；实测单轮 reasoning 3479/output 4586，量化了 max 思考的成本结构）。附带修复：pi Agent 的消息数组在 `agent.state.messages`（`agent.messages` 不存在——此前 messages 兜底从未生效，被 streamBuf 主路径掩盖）。
   - **面经按来源分类**：Experience 补 source relationship，API 输出 source_slug/source_name/company_logo；页面来源 tab（数据驱动，新渠道自动出现）+ 公司筛选 chips（带 logo）+ 卡片（logo/轮次/来源标注/原帖外链）+ 问题树默认 3 题折叠展开。
   - 提交：ed2e246（agents 思考流）/ 9440852（web 渲染+流式）/ 1c99861（面经分类）。
+- **2026-08-29 续八（面试智能体闭环 + web_search 根因修复 + 缓存命中率，用户驱动）**：
+  - **web_search 根因（用户从思考过程发现）**：思考流暴露了"搜索引擎一直返回 undefined 相关内容"——探针实锤 pi-agent-core 的 `AgentTool.execute` 签名是 `(toolCallId, params, signal?, onUpdate?)`，我们把首参当成了参数对象，`query` 恒为 undefined → Bing 真的在搜 "undefined" 这个词。修复后实测搜索质量正常（百科/知乎带日期结果）。**教训：工具签名的静态 cast 绕过了类型检查；思考流作为可观测面第一次就抓到了纯 API 误用。**
+  - **面试智能体闭环（用户定位的核心：面试官结合简历×面经×题库给完整面试）**：
+    - 简历管道（`/api/resumes`）：PDF 上传（pypdf，+python-multipart）→ LLM 结构化画像（姓名/方向/技术栈/项目要点/exam_tags 只能选题库标签词表）→ resumes.parsed + resume_claims（项目要点即"声明"，G1 拷打的声明-证据映射数据源）。实测真实简历：6 项目/5 考点标签全对。
+    - 组卷 v2（`POST /api/interview/plan` 带 resume_id）：候选池 = 公司频率榜 ∪ 简历 exam_tags 命中题 → **LLM 定卷**（押题配比/手撕场景至少各 1/从面经追问池为每题分配 0-2 条真实追问/写考察简报 brief），**id 越池硬校验丢弃**、不足按频率榜确定性补齐。追问池来自该公司 experiences 的追问链节点（真实面经）。实测 brief 精准命中简历（EMNLP/IN-Retriever）；LLM 对不相关追问宁缺毋滥正确拒绝（当前追问数据少：13 条面经仅 3 条追问链，随采集增长）。
+    - agents 消费：PlanQuestion.probes → questionDirective（"来自该公司真实面经，择用改写"）；persona.brief/resumeHighlights → **首轮导演指令注入一次**（之后进入可缓存历史）；开始表单加简历选择器。E2E：简报/要点/probes 全部进入导演指令，面试官正常出题追问。
+  - **缓存命中率（turn2 实测 72%）**：`sessionId` 转发 provider（pi cache-aware hook）+ 会话内 append-only 前缀自然命中；关键优化：brief/简历要点原设计放 systemPrompt——**每会话不同 → 杀死跨会话首轮缓存**，已移到首轮导演指令（systemPrompt 只留稳定的公司/岗位/规则头，同 persona 重开面试首轮即可命中）。日志逐轮记录 input/cacheRead/cacheWrite/reasoning，命中率从此可观测。
+  - 提交：b91a957（web_search 修复）/ 1e3128b（面试智能体闭环）。
 
 ## 10. 合规与 License 策略
 
