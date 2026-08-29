@@ -202,7 +202,7 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 | **P0 基座** | 三服务脚手架、docker-compose、核心数据模型+Alembic、LLM 网关、设计令牌与 UI 壳、pi 运行时接入、一键启停脚本 | api 启动建表；agents 可开 session 对话；web 壳可导航 | ✅ 2026-08-28（全栈实测：stop/start 幂等循环、健康检查、pi 集成 tsc 零错误） |
 | **K1 知识核心** | F1 导入器（11 源注册+license 门禁）+ 增量导入（source_files 收敛记账）+ LLM 结构化抽取（思考开关/大 max_tokens）+ Meili 索引与全文检索 + F2 题库查询/标签/公司筛选 + **厂商分类管道**（24 厂商种子 + AI 推断标注 + 词表硬校验）+ **算法题接入**（kind=algorithm + "算法"标签族 + LeetCode Hot100 种子，供 I1 面试现场手撕调用） | 题库 ≥3000、面经 ≥500（§3 表格）；导入幂等可增量重跑 | ✅ 2026-08-29 管道全线打通并实测（faq-of-llm-interview 首源 128 文件；其余源经 `scripts/import_source.py --all` 后台持续灌库；厂商标注 AI 推断 freq=1，待面经挖掘校准） |
 | **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官从题库组卷（含 kind=algorithm 手撕抽题）** | 30 分钟模拟面试+报告达 §4 验收 | ✅ 2026-08-29 全链路实测：组卷 v2（公司频率榜 ∪ 简历考点押题 → LLM 定卷硬校验 + 面经追问素材 + 考察简报）→ agents 题单驱动面试（0.8-1.3s/轮，简报/简历要点/probes 首轮导演指令注入）→ 评分报告（rubric 五维+原话证据）→ 失分点自动回流 SM-2（续九）。简历解析管道 + 开始表单简历选择器已上线 |
-| **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | 未开始 |
+| **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | 🟡 **v1 落地（2026-08-29 续十）**：zip→备课（模块/三类拷打题/声明对照质证清单）→ 只读工具面拷打（路径监狱）→ 查证式追问实测。待做：题库/面经素材注入开关、报告证据链（文件:行号）、tree-sitter repo map、pgvector 语义检索、git URL 通道、历史会话回显 |
 | **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | 🟡 进行中：**SM-2 失分点回流已落地**（review_items + /review 页 + 报告自动回流，续九）；待做：掌握度统计、Anki 导出（genanki）、JD 匹配度、Dashboard 完整版 |
 | **P1 公开化** | 多用户、UGC 爆料、语音（LiveKit）、岗位聚合评估 | 按 §10 合规重审 | 未开始 |
 
@@ -259,6 +259,13 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **F5 简历工作台 UI**（`/resume`）：PDF 上传（FormData 经同源代理，python-multipart）→ 简历列表 chips → 画像展示（技术栈/考点标签/面试官深挖点/项目要点——要点即 G1 声明底稿）。此前简历只能 curl 上传，闭环入口补齐。
   - **I1 里程碑收口** ✅：组卷（简历押题×面经追问×频率榜）→ 题单驱动面试 → 评分报告 → 失分点回流 SM-2，全链路一次打通。剩余为质量迭代：报告独立页（当前为面试室内联面板）、30 分钟长面试验收。
   - 提交：本笔（F6+F5+I1 收口）。
+- **2026-08-29 续十（G1 项目拷打 v1 落地，用户核心思想产品化）**：
+  - **竞品复核（research/06）**：2026-08-29 复检，"读你的仓库再拷打你"的市场空白仍存——竞品全部停在简历/JD 文本层（han-dreamer、interview-skills、FoloUp、interviewing.io）；最近似的 yizucodes/interview-agent 只对项目文档 RAG 不对代码质证。差异化定位：**懂项目、懂提问的 agent**——先像新入职的资深工程师读明白仓库（备课），再像最较真的面试官对照简历声明逐条质证。
+  - **备课流水线（api `grill/prep.py`）**：zip 上传（Zip Slip 防护：绝对路径/盘符/.. 一律拒绝）→ 噪声过滤（目录/扩展名/大小三道闸 + 400KB 总预算）→ 重要度排序收集（README>入口>src 下大文件）→ LLM 分批备课：每模块产出 **职责/技术点/实现细节题/方案对比题（真实替代方案）/缺失质询题（先确认代码确实没做）**；可选 resume_id → 简历 claims × 备课 → **声明对照质证清单**（supported/suspicious/not_found + 质证问题）。产物落 Project + RepoArtifact（tree/briefing/claims 三 artifact）。
+  - **拷打 agent（agents）**：`mode=grill`，只读工具面 `list_files/read_file/search_code`（路径监狱 resolve 校验 + 64KB 单文件上限，刻意排除 write/bash——dsh Minimal 启发）；备课产物经首轮导演指令注入（systemPrompt 只留稳定规则头，吃跨会话前缀缓存，实测新会话首轮 cacheRead=6144）；思考 high 档。**诚实纪律（实测踩坑修复）**：初版拷打官会宣称"已通读 server.ts"但实际零工具调用、行号从简报编造——加入"禁止声称已读未读文件、引用行号必须来自真实读取"规则 + **工具调用落 JSONL 审计**（tool_use 条目）。修复后实测 5 次真实读码、引用行号准确。
+  - **E2E（用 WenQu 自身仓库做被拷打项目，127 文件/268KB）**：备课 95s 产出 16 模块（连本项目的 SSE 无心跳、会话无过期清理、prompt 无防注入全被抓为缺失质询题）；声明对照把简历 IN-Retriever 全部声明正确判 not_found 并生成"你说的 X 在哪"质证问题——**注水识别价值主张成立**。拷打两轮实测：先核对候选人回答与 queue.ts 一致 → 主动读 session.ts:183 发现无 AbortSignal → 质询"客户端断连后 LLM 继续跑事件堆积，清理机制呢"——查证式深挖（怎么实现的→边界→缺失）完整成立。缓存：turn2 cacheRead=9088。
+  - **web**：/grilling 页（项目名+对照简历+zip→备课报告：总览/声明质证清单/模块拷打弹药→开始拷打）；ChatRoom grill 模式（"拷"头像/思考栏/回答拷打官占位）。
+  - v1 取舍（research/06 §3）：tree-sitter repo map、pgvector 语义检索、git 归属分析 → v2（zip 无 git 历史；子串检索对中等仓库够用，Anthropic 立场支持 agentic search）；评分报告复用 I1（JSONL 同构）。已知缺口：会话历史回显（ChatRoom 客户端态不拉历史）、备课内联执行（大仓库 1-3 分钟，切 arq 时语义不变）、/grilling 页未接已备课项目列表。
 
 ## 10. 合规与 License 策略
 

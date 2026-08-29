@@ -24,6 +24,38 @@ const personaSchema = z.object({
   resumeHighlights: z.array(z.string()).optional(),
 });
 
+const grillBriefingModuleSchema = z.object({
+  files: z.array(z.string()).default([]),
+  purpose: z.string(),
+  tech_points: z.array(z.string()).default([]),
+  detail_questions: z.array(z.string()).default([]),
+  alternative_question: z.string().nullable().optional(),
+  missing_question: z.string().nullable().optional(),
+});
+
+const grillSchema = z.object({
+  projectId: z.number().int(),
+  projectName: z.string().min(1),
+  repoRoot: z.string().min(1),
+  briefing: z.object({
+    overview: z.string(),
+    stack_summary: z.string(),
+    modules: z.array(grillBriefingModuleSchema).default([]),
+  }),
+  claimChecks: z
+    .array(
+      z.object({
+        claim: z.string(),
+        status: z.string(),
+        evidence: z.string().nullable().optional(),
+        probe_question: z.string(),
+      }),
+    )
+    .optional(),
+  bankQuestions: z.array(z.string()).optional(),
+  experienceProbes: z.array(z.string()).optional(),
+});
+
 const createSchema = z.object({
   mode: z.enum(["mock", "grill", "answer"]),
   persona: personaSchema,
@@ -45,6 +77,7 @@ const createSchema = z.object({
     )
     .max(20)
     .optional(),
+  grill: grillSchema.optional(),
 });
 
 const turnSchema = z.object({
@@ -77,6 +110,9 @@ app.post("/sessions", async (c) => {
   const parsed = createSchema.safeParse(await c.req.json());
   if (!parsed.success) {
     return c.json(errorBody("validation_failed", parsed.error.issues.map(String).join("; ")), 422);
+  }
+  if (parsed.data.mode === "grill" && !parsed.data.grill) {
+    return c.json(errorBody("validation_failed", "mode=grill 需要 grill 上下文（projectId/repoRoot/briefing）"), 422);
   }
   const id = await manager.create(parsed.data);
   return c.json({ id }, 201);

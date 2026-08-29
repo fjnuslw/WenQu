@@ -19,9 +19,12 @@ import { initialState, nextPhase, onFollowUp, onQuestionCompleted, shouldAdvance
 import {
   firstTurnContextDirective,
   followUpDirective,
+  grillFirstTurnDirective,
+  grillSystemPrompt,
   phaseDirective,
   systemPrompt,
 } from "./prompts.js";
+import { buildGrillTools } from "./tools/grill-repo.js";
 import type { ClientEvent, PhaseState, PlanQuestion, SessionConfig, TurnOutcome } from "./types.js";
 
 interface RunningSession {
@@ -126,13 +129,26 @@ export class SessionManager {
     const logPath = path.join(this.config.dataDir, `${id}.jsonl`);
     // 思考档位按模式分档：答题（mode=answer）吃满全局档（max）——深度推理是产品特性；
     // 面试官短回复用 medium 即可，省下 reasoning token 开销。
-    const thinkingLevel = config.mode === "answer" ? this.config.thinkingLevel : "medium";
-    const agent = this.runtime.agentFactory(
-      systemPrompt(config),
-      config.mode === "answer" ? [webSearchTool] : undefined,
-      thinkingLevel,
-      id,
-    );
+    const thinkingLevel =
+      config.mode === "answer" ? this.config.thinkingLevel : config.mode === "grill" ? "high" : "medium";
+    let agent: Agent;
+    if (config.mode === "grill" && config.grill) {
+      // 项目拷打（G1）：只读工具面（路径监狱锚定临时仓库根），备课产物经首轮指令注入
+      const tools = buildGrillTools(config.grill.repoRoot);
+      agent = this.runtime.agentFactory(
+        grillSystemPrompt(config.maxFollowUpDepth),
+        [tools.listFiles, tools.readFile, tools.searchCode],
+        thinkingLevel,
+        id,
+      );
+    } else {
+      agent = this.runtime.agentFactory(
+        systemPrompt(config),
+        config.mode === "answer" ? [webSearchTool] : undefined,
+        thinkingLevel,
+        id,
+      );
+    }
     const questions = config.questions ?? [];
     const session: RunningSession = {
       id,
@@ -175,7 +191,10 @@ export class SessionManager {
     // 首轮注入简报/简历要点（仅一次，随后进入可缓存前缀——跨会话缓存的取舍见 prompts.ts）
     if (!session.contextInjected) {
       session.contextInjected = true;
-      const contextDirective = firstTurnContextDirective(session.config.persona);
+      const contextDirective =
+        session.config.mode === "grill" && session.config.grill
+          ? grillFirstTurnDirective(session.config.grill)
+          : firstTurnContextDirective(session.config.persona);
       if (contextDirective) directives.push(contextDirective);
     }
 
@@ -271,8 +290,14 @@ export class SessionManager {
     if (!event || typeof event !== "object") return;
     const typed = event as {
       type?: string;
+      toolName?: string;
       assistantMessageEvent?: { type?: string; delta?: string };
     };
+    if (typed.type === "tool_execution_start" && typeof typed.toolName === "string") {
+      // 工具调用审计：拷打官"是否真的读了代码"是可信度问题，必须落日志（不转发给 UI）
+      void this.appendLog(session, { type: "tool_use", tool: typed.toolName });
+      return;
+    }
     if (typed.type !== "message_update") return;
     const messageEvent = typed.assistantMessageEvent;
     if (!messageEvent) return;

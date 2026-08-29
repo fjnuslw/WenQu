@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     from getoffer.api.routers import (
         companies,
         experiences,
+        grill,
         ingest,
         interview,
         questions,
@@ -84,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(experiences.router)
     app.include_router(resumes.router)
     app.include_router(review.router)
+    app.include_router(grill.router)
 
     @app.get("/api/health")
     async def health() -> dict:

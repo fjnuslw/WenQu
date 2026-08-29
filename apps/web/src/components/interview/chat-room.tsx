@@ -210,7 +210,13 @@ function ReportPanel({ report }: { report: InterviewReport }) {
 
 export function ChatRoom({ sessionId }: { sessionId: string }) {
   const searchParams = useSearchParams();
-  const isAnswerMode = searchParams.get("mode") === "answer";
+  const modeParam = searchParams.get("mode");
+  const isAnswerMode = modeParam === "answer";
+  const isGrillMode = modeParam === "grill";
+  const showSidePanel = isAnswerMode || isGrillMode; // 思考栏：答题/拷打都开
+  const roomTitle = isAnswerMode ? "答题助手" : isGrillMode ? "项目拷打" : "面试室";
+  const avatarChar = isAnswerMode ? "助" : isGrillMode ? "拷" : "考";
+  const inputPlaceholder = isAnswerMode ? "继续追问…" : isGrillMode ? "回答拷打官…" : "输入你的回答…";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [phase, setPhase] = useState("opening");
@@ -347,7 +353,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">{isAnswerMode ? "答题助手" : "面试室"}</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{roomTitle}</h1>
           <p className="text-xs text-ink-faint">会话 {sessionId.slice(0, 8)}…</p>
         </div>
         <div className="flex items-center gap-3">
@@ -376,9 +382,9 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       <div className="flex-1 space-y-4 overflow-y-auto rounded-[10px] border border-line bg-surface/60 p-5">
         {messages.length === 0 && (
           <div className="pt-16 text-center">
-            <p className="text-sm text-ink-dim">{isAnswerMode ? "正在深度思考并解答当前题目…" : "会话已创建，面试官在等你。"}</p>
+            <p className="text-sm text-ink-dim">{isGrillMode ? "拷打官正在读你的代码…" : isAnswerMode ? "正在深度思考并解答当前题目…" : "会话已创建，面试官在等你。"}</p>
             <p className="mt-1 text-xs text-ink-faint">
-              {isAnswerMode ? "思考过程会在右侧栏实时展示。" : "用一句自我介绍开场，面试官会从题单出第一题。"}
+              {showSidePanel ? "思考过程会在右侧栏实时展示。" : "用一句自我介绍开场，面试官会从题单出第一题。"}
             </p>
           </div>
         )}
@@ -396,7 +402,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
               onClick={message.thinking ? () => setPanelIdx(index) : undefined}
             >
               <span className="brand-tile mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-[11px] font-semibold text-white">
-                {isAnswerMode ? "助" : "考"}
+                {avatarChar}
               </span>
               <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-surface-2 px-4 py-3 text-sm leading-relaxed text-ink">
                 {message.thinking && <ThinkingTrace thinking={message.thinking} thinkSeconds={message.thinkSeconds} />}
@@ -420,7 +426,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
         <div className="flex gap-2">
           <Input
             className="h-10"
-            placeholder={isAnswerMode ? "继续追问…" : "输入你的回答…"}
+            placeholder={inputPlaceholder}
             value={draft}
             disabled={busy}
             onChange={(event) => setDraft(event.target.value)}
@@ -445,7 +451,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           )}
         </div>
         <p className="mt-2 text-center text-[11px] text-ink-faint">
-          <span className="kbd">Enter</span> 发送 · {isAnswerMode ? "max 档深度思考 + 联网核实" : "阶段推进与追问深度由确定性状态机控制"} · 支持完整 markdown/公式渲染
+          <span className="kbd">Enter</span> 发送 · {isAnswerMode ? "max 档深度思考 + 联网核实" : isGrillMode ? "拷打官可实时读你的代码查证（只读工具面）" : "阶段推进与追问深度由确定性状态机控制"} · 支持完整 markdown/公式渲染
         </p>
       </div>
     </div>
@@ -455,11 +461,11 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     <div
       className={cn(
         "mx-auto flex h-full flex-col gap-4 p-6",
-        isAnswerMode ? "max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5" : "max-w-3xl",
+        showSidePanel ? "max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5" : "max-w-3xl",
       )}
     >
       {chatColumn}
-      {isAnswerMode && (
+      {showSidePanel && (
         <ThinkingPanel
           text={panelMessage?.role === "interviewer" ? (panelMessage.thinking ?? "") : ""}
           streaming={

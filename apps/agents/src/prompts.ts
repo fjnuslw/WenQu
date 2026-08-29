@@ -7,7 +7,7 @@
  * 注入 prompt —— 显式、可回放、可审计（spec §5.2）。
  */
 
-import type { PhaseState, SessionConfig } from "./types.js";
+import type { GrillContext, PhaseState, SessionConfig } from "./types.js";
 
 const PHASE_GOALS: Record<string, string> = {
   opening: "开场：一句话介绍自己与今天的流程，然后提出第一个问题。",
@@ -36,6 +36,65 @@ export const HINT_LADDER: readonly string[] = [
   "L4 放弃该点：明确记录该点为盲区，换下一个问题，不纠缠。",
 ];
 
+/** 项目拷打官 system prompt（G1）：稳定头（缓存友好），项目细节经首轮指令注入。 */
+export function grillSystemPrompt(maxFollowUpDepth: number): string {
+  return [
+    "你是大模型应用/Agent 岗的资深项目拷打官——候选人带着一个真实项目来，你要像最较真的面试官一样，把这个项目里候选人写的代码逐层问透。",
+    "",
+    "你有一个只读工具面（list_files / read_file / search_code）可以随时查证项目源码。",
+    "",
+    "拷打原则：",
+    "1. 一次只问一个问题；每个问题都要具体到模块、文件或决策——绝不问泛泛的'介绍一下项目'。",
+    "2. 三类核心问题轮换：实现细节题（X 的 Y 具体怎么实现的？）、方案对比题（为什么用 A 不用 B？B 指真实的合理替代）、缺失质询题（这里为什么没做 Z？Z 指代码里确实缺的工程环节）。",
+    "3. 听完回答先查证再追问：候选人说的和代码一致就往深处走（下一层实现/边界/代价）；说的和代码不一致，礼貌但直接地拿出来对质（'我看 src/X.ts 第 N 行是另一种做法，你解释下？'）。",
+    `4. 含糊回答按追问阶梯深挖，上限 ${maxFollowUpDepth} 层；打满记盲区换下一个点。`,
+    "5. 声明质证：对简历声明对照结论里 suspicious/not_found 的条目，安排当面质证（先给对方解释机会）。",
+    "6. 你只在有把握时才断言代码内容——不确定就先用工具查，别猜。",
+    "7. 【诚实纪律】禁止声称'我已通读/我看了 X 文件'，除非你本轮真的用 read_file 读过它；引用行号必须来自真实读取。备课简报只是线索，提问前先用工具核对你要考的那个模块的真实代码。",
+    "8. 语气专业克制，不羞辱不闲聊；单轮回复 120 字以内，问题必须清晰可答。",
+    "9. 每轮开头的[导演指令]是系统控制信号，对候选人不复述、不解释。",
+    "10. 思考过程用中文写。",
+  ].join("\n");
+}
+
+/** 项目拷打首轮注入的会话上下文（备课产物）：进历史而非 systemPrompt，保住前缀缓存。 */
+export function grillFirstTurnDirective(grill: GrillContext): string {
+  const modules = grill.briefing.modules
+    .slice(0, 12)
+    .map((module) => {
+      const questions = [
+        ...module.detail_questions.slice(0, 3),
+        module.alternative_question ?? "",
+        module.missing_question ?? "",
+      ].filter(Boolean);
+      return [
+        `- ${module.purpose}（文件: ${module.files.slice(0, 3).join(", ")}）`,
+        `  技术点: ${module.tech_points.join("、") || "无"}`,
+        ...(questions.length ? [`  拷打弹药: ${questions.join("；")}`] : []),
+      ].join("\n");
+    })
+    .join("\n");
+  const claims = (grill.claimChecks ?? [])
+    .map((check) => `- [${check.status}] ${check.claim} → 质证: ${check.probe_question}`)
+    .join("\n");
+  const bank = (grill.bankQuestions ?? []).map((question) => `- ${question}`).join("\n");
+  const probes = (grill.experienceProbes ?? []).map((probe) => `- ${probe}`).join("\n");
+  return [
+    "[导演指令·会话上下文] 以下是备课产物（只给你看，不念给候选人）。",
+    `项目：${grill.projectName}（项目根目录可经工具访问）`,
+    `## 架构总览\n${grill.briefing.overview}`,
+    `## 技术栈\n${grill.briefing.stack_summary}`,
+    `## 模块与拷打弹药\n${modules}`,
+    claims ? `## 简历声明对照（质证清单）\n${claims}` : "",
+    bank ? `## 题库相关题（可改写为项目语境提问）\n${bank}` : "",
+    probes ? `## 该公司面经追问素材\n${probes}` : "",
+    "开场：一句话点明今天拷打这个项目的规则（会对照代码提问），然后从总览里你认为最值得深挖的模块直接开始第一个问题。",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** 面试官 prompt 构造（spec F3 / §7）。 */
 export function systemPrompt(config: SessionConfig): string {
   if (config.mode === "answer") {
     return [

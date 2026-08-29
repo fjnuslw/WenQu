@@ -62,6 +62,12 @@ class Settings(BaseSettings):
         return uploads
 
     @property
+    def projects_dir(self) -> Path:
+        projects = self.data_dir / "projects"
+        projects.mkdir(parents=True, exist_ok=True)
+        return projects
+
+    @property
     def sessions_dir(self) -> Path:
         return self.data_dir / "sessions"
 

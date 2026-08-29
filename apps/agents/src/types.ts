@@ -44,6 +44,39 @@ export interface SessionConfig {
   maxFollowUpDepth: number;
   /** 题单驱动模式：提供后按题单顺序出题，忽略阶段预算 */
   questions?: PlanQuestion[];
+  /** 项目拷打模式（G1）：临时仓库与备课产物 */
+  grill?: GrillContext;
+}
+
+export interface GrillContext {
+  projectId: number;
+  projectName: string;
+  /** 临时仓库根目录（路径监狱的锚点，agents 直接读共享 data 目录） */
+  repoRoot: string;
+  /** 备课简报（api 备课管道产出：overview/stack/modules 含拷打题） */
+  briefing: {
+    overview: string;
+    stack_summary: string;
+    modules: {
+      files: string[];
+      purpose: string;
+      tech_points: string[];
+      detail_questions: string[];
+      alternative_question?: string | null;
+      missing_question?: string | null;
+    }[];
+  };
+  /** 简历声明对照结论（可选）：拷打官的质证弹药 */
+  claimChecks?: {
+    claim: string;
+    status: string;
+    evidence?: string | null;
+    probe_question: string;
+  }[];
+  /** 题库相关题（可选）：api 按 exam_tags 检索的拷打弹药 */
+  bankQuestions?: string[];
+  /** 该公司面经追问素材（可选） */
+  experienceProbes?: string[];
 }
 
 export interface PhaseState {
