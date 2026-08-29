@@ -237,6 +237,14 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **牛客通道（实测打通）**：话题聚合页 SSR → feed 卡片解析（selectolax DOM：`a[href*=/feed/main/detail/]` → 标题=外层容器文本去预览前缀、正文=`div.placeholder-text`）→ LLM 结构化（is_interview_experience/公司/岗位/轮次/日期/结果/问题树含追问）→ `experiences`+`experience_items` 幂等入库（content_hash=sha256(NFKC(url+文本))，重跑 3 duplicates/0 inserted 实测）。公司归属与 companies 表 name+alias 精确匹配（网易/B站→哔哩哔哩 命中）；词表外（中科闻歌）诚实报告 `unmatched_companies`，不建新公司行。**页面事实修正 research/02 预期**：话题页卡片自带完整内容预览，但 `/feed/main/detail` 详情页是 JS 壳（游客无全文）→ 抽取忠于预览、截断不编造（prompt 规则：可见文本抽不出问题=非面经不入库）。
   - **linux.do 通道（实现完成，运行时诚实失败）**：Discourse 游客 `/t/{id}.json` → cooked HTML 经 selectolax 转文本；实测被 Cloudflare 挑战页 403 拦截——按 spec §10 显式失败（不绕过反爬/不带登录态），错误信息指明改走人工摘录；待浏览器级采集方案再启用。
   - **端点**：`POST /api/ingest/collect/{nowcoder|linux-do}?max_posts=N`（内联执行，与导入一致；切 arq 时语义不变）。**面经页**：experiences 读侧已有 API，web 页接真实数据（公司/轮次徽章 + 编号问题树 + 追问缩进 + 回答上下文注记 + 原帖外链）。E2E 全通：采集→抽取→入库→页面（3 帖：网易 17 节点/中科闻歌 14 节点/腾讯）。
+- **2026-08-29 续七（思考流 + 输出真渲染 + 面经来源分类，用户试用反馈驱动）**：
+  - **调研结论（pi × DeepSeek 思考流复用，用户指定的两步走第一步）**：pi-ai 0.84.3 原生支持 DeepSeek 思考协议——目录条目 `reasoning:true` + `compat.thinkingFormat:"deepseek"`（请求 `thinking:{type}`、响应 `reasoning_content` 流），适配层把增量映射为 `thinking_delta` 事件（api/openai-completions.js:405）；pi-agent-core `AgentState.thinkingLevel` 支持 minimal/low/medium/high/xhigh/**max** 七档，经 `initialState` 注入。零自研协议代码。
+  - **思考流落地**：答题模式吃满 **max 档**（`AGENT_THINKING_LEVEL` 可调，非法值启动即失败）；面试官按模式分档 medium（短回复不值得 reasoning 开销——token 成本优化的第一杠杆）；thinking_delta 经 SSE 转发 + 会话 JSONL 落盘（thinking 字段）；prompt 显式要求**思考用中文**（用户要阅读思考过程理解解题路径）。实测：手撕 MHA 题思考 14.1s、reasoning 3479 tokens 全程右栏实时可见。
+  - **输出渲染**：streamdown 2.6 + `@streamdown/math`（singleDollar 行内公式）+ `@streamdown/code`（shiki 双主题）；DeepSeek 的 `\(\)`/`\[\]` 定界符在代码栅栏外归一化为 `$`/`$$`（纯字符串替换，display-layer 关切）；globals 落暗色 markdown 排版（标题/表格/代码块/KaTeX 溢出）。**人机感治理**：prompt 重写为"学长划重点"人设 + 三段产出结构（**面试口头版**120-200 字可直接背 / 展开解析 / 可能的追问方向）+ 显式禁令（综上所述/总而言之/值得注意的是/满屏加粗/排比开头/emoji/过程性元话语）。实测回答零元话语、LaTeX 公式与 GFM 表格渲染正确。
+  - **真流式修复（关键 UX bug）**：agents 同源代理原实现**全量缓冲** upstream body——max 思考的 40s 里浏览器只看到空气泡、SSE 计时归零（0.0s）。改为 ReadableStream 逐块转发（保留 keepAlive:false 的 400 修复）；Buffer 入队显式拷贝（池化 ArrayBuffer 视图不可直接引用）。
+  - **可观测性**：每轮 usage（input/output/cacheRead/cacheWrite/reasoning）入会话 JSONL——token 开销与缓存命中从此有数（首轮 cacheRead=0 正常，追问轮可验证 DeepSeek 前缀缓存命中；实测单轮 reasoning 3479/output 4586，量化了 max 思考的成本结构）。附带修复：pi Agent 的消息数组在 `agent.state.messages`（`agent.messages` 不存在——此前 messages 兜底从未生效，被 streamBuf 主路径掩盖）。
+  - **面经按来源分类**：Experience 补 source relationship，API 输出 source_slug/source_name/company_logo；页面来源 tab（数据驱动，新渠道自动出现）+ 公司筛选 chips（带 logo）+ 卡片（logo/轮次/来源标注/原帖外链）+ 问题树默认 3 题折叠展开。
+  - 提交：ed2e246（agents 思考流）/ 9440852（web 渲染+流式）/ 1c99861（面经分类）。
 
 ## 10. 合规与 License 策略
 
