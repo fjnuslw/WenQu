@@ -49,6 +49,22 @@ function Report-Port([string]$Name, [int]$Preferred, [int]$Resolved) {
     if ($Preferred -eq $Resolved) { Write-Ok "$Name = $Resolved" }
     else { Write-Warn2 "$Name 首选 $Preferred 被占用，改用 $Resolved" }
 }
+
+# 启动前清障：目标端口若被本项目进程（python/node/cmd/npm）占用则结束之，
+# 防止 Next16 单实例锁 / EADDRINUSE 导致新实例静默退出（多次排障的根因）。
+function Clear-OurPort([int]$Port) {
+    $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    foreach ($conn in $conns) {
+        $ownerPid = $conn.OwningProcess
+        $ownerName = (Get-Process -Id $ownerPid -ErrorAction SilentlyContinue).ProcessName
+        if (@("python", "node", "cmd", "npm") -contains $ownerName) {
+            Write-Warn2 "端口 $Port 上残留本项目进程 $ownerName(pid $ownerPid)，先结束"
+            taskkill /PID $ownerPid /T /F | Out-Null
+        } elseif ($ownerName) {
+            Write-Fail "端口 $Port 被外部进程 $ownerName(pid $ownerPid) 占用，跳过清理"
+        }
+    }
+}
 Report-Port "api" $Script:Defaults.ApiPort $apiPort
 Report-Port "agents" $Script:Defaults.AgentsPort $agentsPort
 Report-Port "web" $Script:Defaults.WebPort $webPort
@@ -86,6 +102,7 @@ if ($NoDocker) {
 
 # ---- 3. API ----
 Write-Step "启动 api (FastAPI)"
+Clear-OurPort $apiPort
 $apiProcId = Read-ProcId "api"
 if ($null -ne $apiProcId -and (Test-ProcAlive $apiProcId)) {
     Write-Ok "api 已在运行（pid $apiProcId），跳过"
@@ -110,6 +127,7 @@ if ($null -ne $apiProcId -and (Test-ProcAlive $apiProcId)) {
 
 # ---- 4. Agents ----
 Write-Step "启动 agents (pi 运行时)"
+Clear-OurPort $agentsPort
 $agentsProcId = Read-ProcId "agents"
 if ($null -ne $agentsProcId -and (Test-ProcAlive $agentsProcId)) {
     Write-Ok "agents 已在运行（pid $agentsProcId），跳过"
@@ -135,12 +153,13 @@ if ($null -ne $agentsProcId -and (Test-ProcAlive $agentsProcId)) {
 
 # ---- 5. Web ----
 Write-Step "启动 web (Next.js)"
+Clear-OurPort $webPort
 $envLocal = Join-Path $repoRoot "apps\web\.env.local"
 @"
-NEXT_PUBLIC_API_URL=http://127.0.0.1:$apiPort
-NEXT_PUBLIC_AGENTS_URL=http://127.0.0.1:$agentsPort
+API_PROXY_TARGET=http://127.0.0.1:$apiPort
+AGENTS_PROXY_TARGET=http://127.0.0.1:$agentsPort
 "@ | Set-Content -Path $envLocal -Encoding UTF8
-Write-Ok "已写 apps\web\.env.local（指向本次解析的 api/agents 端口）"
+Write-Ok "已写 apps\web\.env.local（同源代理指向本次解析的 api/agents 端口）"
 $webProcId = Read-ProcId "web"
 if ($null -ne $webProcId -and (Test-ProcAlive $webProcId)) {
     Write-Ok "web 已在运行（pid $webProcId），跳过（如需新端口请先 stop）"

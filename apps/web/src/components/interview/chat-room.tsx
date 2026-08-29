@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AGENTS_URL } from "@/lib/api";
+import { agentsUrl } from "@/lib/api";
 import { INTERVIEW_PHASES } from "@/lib/phases";
 import { cn } from "@/lib/utils";
 
@@ -98,7 +98,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     scrollToEnd();
 
     try {
-      const response = await fetch(`${AGENTS_URL}/sessions/${sessionId}/turn`, {
+      const response = await fetch(agentsUrl(`/sessions/${sessionId}/turn`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { AGENTS_URL, ApiError } from "@/lib/api";
+import { agentsUrl, ApiError } from "@/lib/api";
 
 export function InterviewStartForm() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export function InterviewStartForm() {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`${AGENTS_URL}/sessions`, {
+      const response = await fetch(agentsUrl("/sessions"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

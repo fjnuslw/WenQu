@@ -1,4 +1,4 @@
-/** 后端访问层：类型化错误，禁止静默兜底（spec §7）。 */
+/** 后端访问层：全部走同源代理（next.config.ts rewrites），无跨域、无系统代理干扰。 */
 
 export class ApiError extends Error {
   constructor(
@@ -11,15 +11,12 @@ export class ApiError extends Error {
   }
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:23480";
-export const AGENTS_URL = process.env.NEXT_PUBLIC_AGENTS_URL ?? "http://127.0.0.1:23481";
-
 interface ErrorBody {
   error?: { code?: string; message?: string };
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(path, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     cache: "no-store",
@@ -33,4 +30,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     );
   }
   return (await response.json()) as T;
+}
+
+/** agents 服务同源前缀（Next rewrite → agents 服务根路径）。 */
+export function agentsUrl(path: string): string {
+  return `/agents${path}`;
 }
