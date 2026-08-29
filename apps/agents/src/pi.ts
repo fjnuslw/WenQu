@@ -15,7 +15,7 @@
  *   - pi-ai：`createModels()` / `setProvider()` / `getModel()`；`createProvider`、
  *     `envApiKeyAuth` 由包根导出；`openAICompletionsApi` 位于子路径 api/openai-completions.lazy
  */
-import { Agent } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import {
   createModels,
   createProvider,
@@ -54,7 +54,7 @@ function buildDeepSeekProvider(): Provider<"openai-completions"> {
 }
 
 export interface PiRuntime {
-  agentFactory: (systemPrompt: string) => Agent;
+  agentFactory: (systemPrompt: string, tools?: AgentTool[]) => Agent;
 }
 
 export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
@@ -65,9 +65,9 @@ export function bootstrapPi(config: AgentServiceConfig): PiRuntime {
     throw new Error(`pi-ai 目录中不存在: deepseek/${config.defaultModel}`);
   }
   return {
-    agentFactory: (systemPrompt: string) =>
+    agentFactory: (systemPrompt: string, tools?: AgentTool[]) =>
       new Agent({
-        initialState: { systemPrompt, model },
+        initialState: tools ? { systemPrompt, model, tools } : { systemPrompt, model },
         streamFn: models.streamSimple.bind(models),
       }),
   };

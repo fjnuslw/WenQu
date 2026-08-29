@@ -1,13 +1,13 @@
 "use client";
 
 import { FileText, SendHorizonal } from "lucide-react";
-import { useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiFetch } from "@/lib/api";
-import { agentsUrl } from "@/lib/api";
+import { agentsUrl, apiFetch } from "@/lib/api";
 import { INTERVIEW_PHASES } from "@/lib/phases";
 import { cn } from "@/lib/utils";
 
@@ -138,6 +138,8 @@ function ReportPanel({ report }: { report: InterviewReport }) {
 }
 
 export function ChatRoom({ sessionId }: { sessionId: string }) {
+  const searchParams = useSearchParams();
+  const isAnswerMode = searchParams.get("mode") === "answer";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [phase, setPhase] = useState("opening");
@@ -150,6 +152,15 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const currentPhase = INTERVIEW_PHASES.find((p) => p.id === phase);
+
+  // 答题模式：挂载即把题目发给解答助手（题目已在会话题单里，directors 会注入题干）
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (!isAnswerMode || autoSentRef.current) return;
+    autoSentRef.current = true;
+    void send("请结合最新资料解答当前题目，并给出常见的追问方向。");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function scrollToEnd() {
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
@@ -170,12 +181,12 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     }
   }
 
-  async function send() {
-    const text = draft.trim();
+  async function send(forcedText?: string) {
+    const text = (forcedText ?? draft).trim();
     if (!text || busy) return;
     setBusy(true);
     setError(null);
-    setDraft("");
+    if (!forcedText) setDraft("");
     setMessages((current) => [...current, { role: "candidate", text }, { role: "interviewer", text: "" }]);
     scrollToEnd();
 
@@ -225,7 +236,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     <div className="mx-auto flex h-full max-w-3xl flex-col p-6">
       <header className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">面试室</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{isAnswerMode ? "答题助手" : "面试室"}</h1>
           <p className="text-xs text-ink-faint">会话 {sessionId.slice(0, 8)}…</p>
         </div>
         <div className="flex items-center gap-3">
@@ -254,7 +265,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       <div className="flex-1 space-y-4 overflow-y-auto rounded-[10px] border border-line bg-surface/60 p-5">
         {messages.length === 0 && (
           <div className="pt-16 text-center">
-            <p className="text-sm text-ink-dim">会话已创建，面试官在等你。</p>
+            <p className="text-sm text-ink-dim">{isAnswerMode ? "正在解答当前题目…" : "会话已创建，面试官在等你。"}</p>
             <p className="mt-1 text-xs text-ink-faint">用一句自我介绍开场，面试官会从题单出第一题。</p>
           </div>
         )}
@@ -268,7 +279,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           ) : (
             <div key={index} className="bubble-in mr-auto flex max-w-[85%] items-start gap-2.5">
               <span className="brand-tile mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-[11px] font-semibold text-white">
-                考
+                {isAnswerMode ? "助" : "考"}
               </span>
               <div className="rounded-xl rounded-tl-sm bg-surface-2 px-4 py-2.5 text-sm leading-relaxed text-ink">
                 {message.text || (busy ? <span className="stream-cursor" /> : "")}

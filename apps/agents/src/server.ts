@@ -24,7 +24,7 @@ const personaSchema = z.object({
 });
 
 const createSchema = z.object({
-  mode: z.enum(["mock", "grill"]),
+  mode: z.enum(["mock", "grill", "answer"]),
   persona: personaSchema,
   maxQuestionsPerPhase: z.number().int().min(1).max(10).default(4),
   maxFollowUpDepth: z.number().int().min(1).max(4).default(4),

@@ -1,6 +1,6 @@
 /** 面试域类型（spec F3）。 */
 
-export type SessionMode = "mock" | "grill";
+export type SessionMode = "mock" | "grill" | "answer";
 
 export type Phase =
   | "opening"

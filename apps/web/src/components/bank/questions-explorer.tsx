@@ -1,13 +1,14 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, Code2, Inbox, Link as LinkIcon, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Code2, Inbox, Link as LinkIcon, MessageCircleQuestion, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { ApiError, apiFetch } from "@/lib/api";
+import { agentsUrl, apiFetch, ApiError } from "@/lib/api";
 import { KIND_LABELS } from "@/lib/tags";
 import { cn } from "@/lib/utils";
 
@@ -164,6 +165,7 @@ interface ListState {
 const INITIAL_LIST: ListState = { items: [], total: 0, isFetching: false, loaded: false, error: null };
 
 export function QuestionsExplorer() {
+  const router = useRouter();
   const [list, setList] = useState<ListState>(INITIAL_LIST);
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -175,6 +177,7 @@ export function QuestionsExplorer() {
   const query = useDebouncedValue(queryInput, 300); // 防抖：只有停顿才触发请求
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(20);
+  const [askingId, setAskingId] = useState<number | null>(null);
 
   useEffect(() => {
     apiFetch<{ items: CompanyItem[] }>("/api/companies")
@@ -216,6 +219,40 @@ export function QuestionsExplorer() {
     },
     [company, track, kind, tag, query, page, pageSize],
   );
+
+  // 问答助手：二次确认后创建 answer 会话并跳转（websearch 闭环）
+  async function askAssistant(question: QuestionItem) {
+    const confirmed = window.confirm(
+      `让 AI 解答助手回答这道题？（可联网搜索核实）
+
+${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
+    );
+    if (!confirmed) return;
+    setAskingId(question.id);
+    try {
+      const response = await fetch(agentsUrl("/sessions"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "answer",
+          persona: { role: "面试题解答助手" },
+          maxQuestionsPerPhase: 4,
+          maxFollowUpDepth: 4,
+          questions: [{ id: question.id, stem: question.stem, kind: question.kind, answer: question.answer }],
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new ApiError(response.status, "create_failed", body?.error?.message ?? `创建会话失败: ${response.status}`);
+      }
+      const { id } = (await response.json()) as { id: string };
+      router.push(`/interview/${id}?mode=answer`);
+    } catch (caught) {
+      alert(`问答助手启动失败：${caught instanceof Error ? caught.message : String(caught)}`);
+    } finally {
+      setAskingId(null);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -423,8 +460,17 @@ export function QuestionsExplorer() {
                       ))}
                     </div>
                   </div>
-                  <div className="shrink-0">
+                  <div className="flex shrink-0 flex-col items-end gap-2">
                     <SourceChip source={question.source} />
+                    <button
+                      onClick={() => void askAssistant(question)}
+                      disabled={askingId !== null}
+                      className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] text-ink-dim transition-colors hover:border-accent hover:text-accent disabled:opacity-40"
+                      title="AI 解答助手（可联网搜索，支持追问）"
+                    >
+                      <MessageCircleQuestion className="size-3" />
+                      {askingId === question.id ? "启动中…" : "问助手"}
+                    </button>
                   </div>
                 </div>
               </Card>

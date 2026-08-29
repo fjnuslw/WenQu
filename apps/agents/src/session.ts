@@ -14,6 +14,7 @@ import type { Agent } from "@earendil-works/pi-agent-core";
 
 import type { AgentServiceConfig } from "./config.js";
 import type { PiRuntime } from "./pi.js";
+import { webSearchTool } from "./tools/web-search.js";
 import { initialState, nextPhase, onFollowUp, onQuestionCompleted, shouldAdvance } from "./state-machine.js";
 import { followUpDirective, phaseDirective, systemPrompt } from "./prompts.js";
 import type { ClientEvent, PhaseState, PlanQuestion, SessionConfig, TurnOutcome } from "./types.js";
@@ -106,7 +107,10 @@ export class SessionManager {
     const id = randomUUID();
     await mkdir(this.config.dataDir, { recursive: true });
     const logPath = path.join(this.config.dataDir, `${id}.jsonl`);
-    const agent = this.runtime.agentFactory(systemPrompt(config));
+    const agent = this.runtime.agentFactory(
+      systemPrompt(config),
+      config.mode === "answer" ? [webSearchTool] : undefined,
+    );
     const questions = config.questions ?? [];
     const session: RunningSession = {
       id,

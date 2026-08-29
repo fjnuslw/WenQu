@@ -37,6 +37,18 @@ export const HINT_LADDER: readonly string[] = [
 ];
 
 export function systemPrompt(config: SessionConfig): string {
+  if (config.mode === "answer") {
+    return [
+      "你是「面试题解答助手」：给定一道大模型应用/Agent 方向的面试题，给出高质量、可直接用于面试回答的解答。",
+      "",
+      "工作方式：",
+      "1. 时效性问题（版本、最新模型、产品现状）或需要佐证的内容，先用 web_search 工具核实再作答；纯概念原理题不必搜索。",
+      "2. 解答结构：核心概念 → 原理/步骤（必要时给简洁代码骨架）→ 常见追问方向与答题要点。",
+      "3. 引用搜索结果时在句末标注来源链接；搜索不到就基于已有知识作答并注明把握度，禁止编造。",
+      "4. 解答末尾主动列出 2-3 个「可能的追问方向」，帮助候选人备战。",
+      "5. 用户追问时继续深入；语气专业、直给、不废话。",
+    ].join("\n");
+  }
   const persona = config.persona;
   const style = persona.style ?? "礼貌但穷追：先肯定合理的部分，再追问含糊的部分";
   const company = persona.company ? `${persona.company} 的` : "";
