@@ -251,6 +251,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     void (async () => {
       let hasHistory = false;
+      let aliveNow = true; // agents 重启后的会话只读，不自动发开场
       try {
         const response = await fetch(agentsUrl(`/sessions/${sessionId}/history`));
         if (response.ok) {
@@ -259,6 +260,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
             messages: ChatMessage[];
           };
           setSessionAlive(data.alive);
+          aliveNow = data.alive;
           if (data.messages.length > 0) {
             setMessages(data.messages);
             hasHistory = true;
@@ -267,9 +269,14 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       } catch {
         // agents 不可达：新会话场景，不阻塞
       }
-      if (isAnswerMode && !hasHistory && !autoSentRef.current) {
+      const autoPrompt = isAnswerMode
+        ? "请解答当前题目。"
+        : isGrillMode
+          ? "面试官您好，我是这个项目的作者，请开始拷打。"
+          : null;
+      if (autoPrompt && !hasHistory && !autoSentRef.current && aliveNow) {
         autoSentRef.current = true;
-        void send("请解答当前题目。");
+        void send(autoPrompt);
       }
       setHistoryLoaded(true);
     })();
