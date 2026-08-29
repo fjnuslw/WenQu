@@ -206,7 +206,7 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 | **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | 未开始 |
 | **P1 公开化** | 多用户、UGC 爆料、语音（LiveKit）、岗位聚合评估 | 按 §10 合规重审 | 未开始 |
 
-**K1 遗留（转入 I1 期间的质量迭代）**：① 存量题标签重打标与 track/厂商回填（进行中：统一分类守护逐批处理，进程见 logs/import-classify.log）；② 厂商标注为 AI 推断（宁缺毋滥 prompt 但通用题易挂大厂），需面经事实对校准频率榜；③ 导入仍为同步内联执行，超大源建议切 arq 队列（端点语义不变）；④ 牛客/linux.do 采集器（K1 计划内，随面经管道 F1 后半实现）。
+**K1 遗留（转入 I1 期间的质量迭代）**：① 存量题标签重打标与 track/厂商回填（进行中：统一分类守护逐批处理，进程见 logs/import-classify.log）；② 厂商标注为 AI 推断（宁缺毋滥 prompt 但通用题易挂大厂），需面经事实对校准频率榜（面经采集器已落地，可从 experiences.items 挖掘公司×题目共现）；③ 导入仍为同步内联执行，超大源建议切 arq 队列（端点语义不变）；④ 牛客/linux.do 采集器——**牛客已落地（续六）**，linux.do 被 Cloudflare 拦截显式失败，待浏览器级方案或人工摘录。
 
 **2026-08-29 增补（题库组织升级，用户驱动）**：
 - **岗位大类维度**：`questions.track` ∈ {大模型应用, 大模型算法, 大模型应用算法, 通用基础}；新导入题由抽取管道直接判定（qa_extract track 字段），存量题由统一分类管道回填（`POST /api/ingest/classify-companies` 一轮同时产出 track + companies，只补空值不覆盖）。
@@ -232,6 +232,11 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **UI 美化落地验证**（浏览器实测 /bank 生产构建）：题目卡"问助手"按钮 40 处可见；厂商瓷片放大（logo size-14、字节 1069/阿里 922/腾讯 715/Google 435/DeepSeek 340/微软 334/百度 108）；全局字体栈升级（Inter/Segoe UI Variable/PingFang SC/微软雅黑，tabular-nums、行高 1.65、标题 letter-spacing）；题干 15px。共 22679 题。
   - **题单驱动模式状态机修复**：追问命中时误入 else 分支直接置 closing（与追问指令矛盾）、队列耗尽时 throw 越界。修正语义：含糊→原题追问不推进队列；有效回答/追问打满→出下一题；**队列耗尽→进入 closing 并在后续轮次稳定维持**（重复播报收尾指令无害）。
   - 提交：db91173（fix agents）、9c01f41（feat web+脚本），fjnuslw 推送 main。
+- **2026-08-29 续六（F1 面经采集器落地：牛客 SSR 通道打通，linux.do 游客通道被 CF 拦截）**：
+  - **渠道架构**（`ingest/collect/`）：`PoliteClient` 合规客户端——真实 UA + 渠道级最小间隔（牛客 8s / linux.do 10s）+ **robots 门禁**（urllib.robotparser 标准库解析；robots.txt 不可获取=合规不可判定=拒绝采集，不默认放行）+ 显式代理配置 `GETOFFER_COLLECT_PROXY`（本机直连两个目标域名均 SSL 失败，实测需走本机 Clash，.env 已配，gitignore 内）。类型化错误族新增 `ComplianceViolation`（我们的闸门）与 UpstreamError 区分（上游拒绝）。
+  - **牛客通道（实测打通）**：话题聚合页 SSR → feed 卡片解析（selectolax DOM：`a[href*=/feed/main/detail/]` → 标题=外层容器文本去预览前缀、正文=`div.placeholder-text`）→ LLM 结构化（is_interview_experience/公司/岗位/轮次/日期/结果/问题树含追问）→ `experiences`+`experience_items` 幂等入库（content_hash=sha256(NFKC(url+文本))，重跑 3 duplicates/0 inserted 实测）。公司归属与 companies 表 name+alias 精确匹配（网易/B站→哔哩哔哩 命中）；词表外（中科闻歌）诚实报告 `unmatched_companies`，不建新公司行。**页面事实修正 research/02 预期**：话题页卡片自带完整内容预览，但 `/feed/main/detail` 详情页是 JS 壳（游客无全文）→ 抽取忠于预览、截断不编造（prompt 规则：可见文本抽不出问题=非面经不入库）。
+  - **linux.do 通道（实现完成，运行时诚实失败）**：Discourse 游客 `/t/{id}.json` → cooked HTML 经 selectolax 转文本；实测被 Cloudflare 挑战页 403 拦截——按 spec §10 显式失败（不绕过反爬/不带登录态），错误信息指明改走人工摘录；待浏览器级采集方案再启用。
+  - **端点**：`POST /api/ingest/collect/{nowcoder|linux-do}?max_posts=N`（内联执行，与导入一致；切 arq 时语义不变）。**面经页**：experiences 读侧已有 API，web 页接真实数据（公司/轮次徽章 + 编号问题树 + 追问缩进 + 回答上下文注记 + 原帖外链）。E2E 全通：采集→抽取→入库→页面（3 帖：网易 17 节点/中科闻歌 14 节点/腾讯）。
 
 ## 10. 合规与 License 策略
 
