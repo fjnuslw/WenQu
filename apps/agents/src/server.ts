@@ -170,6 +170,111 @@ app.get("/sessions/:id", (c) => {
   }
 });
 
+function sessionAlive(id: string): boolean {
+  try {
+    manager.snapshot(id);
+    return true;
+  } catch {
+    return false; // SessionNotFound = agents 重启后内存会话丢失（历史仍可回放）
+  }
+}
+
+/** 会话列表（从 JSONL 文件扫描，含已过期的）：mode/persona/轮数/时间——供前端"继续/回放"。 */
+app.get("/sessions", async (c) => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  const path = await import("node:path");
+  let files: string[] = [];
+  try {
+    files = (await readdir(config.dataDir)).filter((name) => name.endsWith(".jsonl"));
+  } catch {
+    files = [];
+  }
+  const items = await Promise.all(
+    files.map(async (name) => {
+      const id = name.replace(/\.jsonl$/, "");
+      const filePath = path.join(config.dataDir, name);
+      let mode = "unknown";
+      let persona: Record<string, unknown> = {};
+      let turns = 0;
+      let projectName: string | null = null;
+      let grillProjectId: number | null = null;
+      let lastTs: string | null = null;
+      try {
+        const raw = await readFile(filePath, "utf8");
+        for (const line of raw.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const entry = JSON.parse(line) as Record<string, unknown>;
+            if (entry.type === "session_start") {
+              const cfg = (entry.config ?? {}) as Record<string, unknown>;
+              mode = String(cfg.mode ?? "unknown");
+              persona = (cfg.persona ?? {}) as Record<string, unknown>;
+              const grill = cfg.grill as { projectName?: string; projectId?: number } | undefined;
+              projectName = grill?.projectName ?? null;
+              grillProjectId = grill?.projectId ?? null;
+            }
+            if (entry.type === "assistant") turns += 1;
+            if (typeof entry.ts === "string") lastTs = entry.ts;
+          } catch {
+            // 损坏行跳过（append-only 尾部残留）
+          }
+        }
+      } catch {
+        return null;
+      }
+      const alive = sessionAlive(id);
+      return { id, mode, persona, turns, projectName, projectId: grillProjectId, last_ts: lastTs, alive };
+    }),
+  );
+  const sorted = items
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => ((a.last_ts ?? "") < (b.last_ts ?? "") ? 1 : -1));
+  return c.json({ items: sorted.slice(0, 30) });
+});
+
+/** 会话历史（JSONL 重放）：刷新页面/换设备后继续聊的前提是 agents 内存里会话仍存活。 */
+app.get("/sessions/:id/history", async (c) => {
+  const id = c.req.param("id");
+  const { readFile } = await import("node:fs/promises");
+  const path = await import("node:path");
+  const filePath = path.join(config.dataDir, `${id}.jsonl`);
+  let raw: string;
+  try {
+    raw = await readFile(filePath, "utf8");
+  } catch {
+    return c.json(errorBody("not_found", `会话日志不存在: ${id}`), 404);
+  }
+  const messages: { role: "candidate" | "interviewer"; text: string; thinking: string; thinkSeconds: number | null }[] = [];
+  let thinkStartedAt: number | null = null;
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line) as Record<string, unknown>;
+      if (entry.type === "user") {
+        messages.push({ role: "candidate", text: String(entry.text ?? ""), thinking: "", thinkSeconds: null });
+      } else if (entry.type === "assistant") {
+        const ts = typeof entry.ts === "string" ? Date.parse(entry.ts) : null;
+        let thinkSeconds: number | null = null;
+        if (thinkStartedAt !== null && ts !== null) {
+          thinkSeconds = Math.max(0, (ts - thinkStartedAt) / 1000);
+        }
+        messages.push({
+          role: "interviewer",
+          text: String(entry.text ?? ""),
+          thinking: String(entry.thinking ?? ""),
+          thinkSeconds,
+        });
+        thinkStartedAt = null;
+      }
+      if (entry.type === "user") thinkStartedAt = typeof entry.ts === "string" ? Date.parse(entry.ts) : null;
+    } catch {
+      // 损坏行跳过
+    }
+  }
+  const alive = sessionAlive(id);
+  return c.json({ id, alive, messages });
+});
+
 serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`[agents] listening on http://localhost:${info.port} (model: ${config.defaultModel})`);
 });

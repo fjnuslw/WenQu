@@ -31,23 +31,66 @@ function normalizeMathDelimiters(text: string): string {
     .join("```");
 }
 
+/**
+ * `文件路径:行号` → 可点击引用（拷打官回复的证据链入口）。
+ * 这是生成侧的文本变换（把模式转成 markdown 链接），不是用正则解析 HTML/markdown——
+ * spec §7 禁的是后者。仅 grill 语境启用，路径须含扩展名且行号为 1-5 位数字。
+ */
+const FILE_LINE_REF = /([A-Za-z0-9_\-./\\]+\.[A-Za-z0-9]{1,5}):(\d{1,5})/g;
+
+function linkifyFileRefs(text: string): string {
+  return text.replace(FILE_LINE_REF, (_match, path: string, line: string) => {
+    return `[${path}:${line}](#open-file:${path}:${line})`;
+  });
+}
+
 export function AssistantMarkdown({
   text,
   streaming = false,
   className,
+  onOpenFileRef,
 }: {
   text: string;
   streaming?: boolean;
   className?: string;
+  /** 提供时启用 file:line 引用链接化（grill 模式）：点击回调 (path, line) */
+  onOpenFileRef?: (path: string, line: number) => void;
 }) {
+  const body = onOpenFileRef
+    ? linkifyFileRefs(normalizeMathDelimiters(text))
+    : normalizeMathDelimiters(text);
   return (
     <Streamdown
       mode={streaming ? "streaming" : "static"}
       parseIncompleteMarkdown={streaming}
       plugins={{ code, math: mathPlugin }}
       className={cn("assistant-markdown text-sm leading-relaxed", className)}
+      components={
+        onOpenFileRef
+          ? {
+              a: ({ href, children }) => {
+                if (typeof href === "string" && href.startsWith("#open-file:")) {
+                  const ref = href.slice("#open-file:".length);
+                  const separator = ref.lastIndexOf(":");
+                  const path = ref.slice(0, separator);
+                  const line = Number(ref.slice(separator + 1));
+                  return (
+                    <button
+                      type="button"
+                      className="rounded bg-accent/15 px-1 py-0.5 font-mono text-[0.85em] text-accent hover:bg-accent/25"
+                      onClick={() => onOpenFileRef(path, Number.isFinite(line) ? line : 1)}
+                    >
+                      {children}
+                    </button>
+                  );
+                }
+                return <a href={href}>{children}</a>;
+              },
+            }
+          : undefined
+      }
     >
-      {normalizeMathDelimiters(text)}
+      {body}
     </Streamdown>
   );
 }

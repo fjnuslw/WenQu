@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AssistantMarkdown } from "@/components/assistant/markdown";
+import { FileBrowser } from "@/components/grill/file-browser";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,19 +137,15 @@ function ThinkingPanel({
   text,
   streaming,
   seconds,
+  bare = false,
 }: {
   text: string;
   streaming: boolean;
   seconds: number | null;
+  bare?: boolean;
 }) {
-  return (
-    <aside className="hidden min-h-0 flex-col rounded-[10px] border border-line bg-surface/60 lg:flex lg:h-full">
-      <header className="flex items-center justify-between border-b border-line px-4 py-3">
-        <span className="text-sm font-medium text-ink">思考过程</span>
-        <Badge variant={streaming ? "accent" : "default"}>
-          {streaming ? "思考中" : seconds !== null ? `${seconds.toFixed(1)}s` : "max 档"}
-        </Badge>
-      </header>
+  const body = (
+    <>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed text-ink-dim">
         {text ? (
           <p className="whitespace-pre-wrap">
@@ -161,6 +158,18 @@ function ThinkingPanel({
           </p>
         )}
       </div>
+    </>
+  );
+  if (bare) return body;
+  return (
+    <aside className="hidden min-h-0 flex-col rounded-[10px] border border-line bg-surface/60 lg:flex lg:h-full">
+      <header className="flex items-center justify-between border-b border-line px-4 py-3">
+        <span className="text-sm font-medium text-ink">思考过程</span>
+        <Badge variant={streaming ? "accent" : "default"}>
+          {streaming ? "思考中" : seconds !== null ? `${seconds.toFixed(1)}s` : "max 档"}
+        </Badge>
+      </header>
+      {body}
     </aside>
   );
 }
@@ -214,6 +223,8 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   const isAnswerMode = modeParam === "answer";
   const isGrillMode = modeParam === "grill";
   const showSidePanel = isAnswerMode || isGrillMode; // 思考栏：答题/拷打都开
+  const grillProjectId = isGrillMode ? searchParams.get("project") : null;
+  const [sideTab, setSideTab] = useState<"thinking" | "files">("thinking");
   const roomTitle = isAnswerMode ? "答题助手" : isGrillMode ? "项目拷打" : "面试室";
   const avatarChar = isAnswerMode ? "助" : isGrillMode ? "拷" : "考";
   const inputPlaceholder = isAnswerMode ? "继续追问…" : isGrillMode ? "回答拷打官…" : "输入你的回答…";
@@ -227,18 +238,48 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [panelIdx, setPanelIdx] = useState<number | null>(null);
+  const [sessionAlive, setSessionAlive] = useState(true);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const thinkStartedAtRef = useRef<number | null>(null);
 
   const currentPhase = INTERVIEW_PHASES.find((p) => p.id === phase);
 
-  // 答题模式：挂载即把题目发给解答助手（题目已在会话题单里，directors 会注入题干）
+  // 历史（刷新/回访继续）：JSONL 重放；alive=false 表示 agents 重启过 → 只读回放
+  // 答题模式且无历史时自动发出首问；有历史则不重复发。
   const autoSentRef = useRef(false);
   useEffect(() => {
-    if (!isAnswerMode || autoSentRef.current) return;
-    autoSentRef.current = true;
-    void send("请解答当前题目。");
+    void (async () => {
+      let hasHistory = false;
+      try {
+        const response = await fetch(agentsUrl(`/sessions/${sessionId}/history`));
+        if (response.ok) {
+          const data = (await response.json()) as {
+            alive: boolean;
+            messages: ChatMessage[];
+          };
+          setSessionAlive(data.alive);
+          if (data.messages.length > 0) {
+            setMessages(data.messages);
+            hasHistory = true;
+          }
+        }
+      } catch {
+        // agents 不可达：新会话场景，不阻塞
+      }
+      if (isAnswerMode && !hasHistory && !autoSentRef.current) {
+        autoSentRef.current = true;
+        void send("请解答当前题目。");
+      }
+      setHistoryLoaded(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // file:line 引用点击 → 侧栏文件 tab 打开定位
+  const openFileRef = useCallback((path: string, line: number) => {
+    setSideTab("files");
+    window.dispatchEvent(new CustomEvent("wenqu:open-file", { detail: { path, line } }));
   }, []);
 
   // 思考栏默认跟随最新有思考内容的消息；点击气泡可回看历史思考
@@ -407,7 +448,11 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
               <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-surface-2 px-4 py-3 text-sm leading-relaxed text-ink">
                 {message.thinking && <ThinkingTrace thinking={message.thinking} thinkSeconds={message.thinkSeconds} />}
                 {message.text ? (
-                  <AssistantMarkdown text={message.text} streaming={busy && index === messages.length - 1} />
+                  <AssistantMarkdown
+                    text={message.text}
+                    streaming={busy && index === messages.length - 1}
+                    onOpenFileRef={isGrillMode && grillProjectId ? openFileRef : undefined}
+                  />
                 ) : (
                   busy && <span className="stream-cursor" />
                 )}
@@ -420,6 +465,12 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
 
       {error && <p className="mt-2 text-sm text-danger">出错了：{error}</p>}
 
+      {historyLoaded && !sessionAlive && (
+        <p className="mt-2 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
+          该会话在服务重启后过期：可完整回放下方对话，但不能继续发送。要继续拷打请开新会话。
+        </p>
+      )}
+
       {report && <ReportPanel report={report} />}
 
       <div className="mt-4">
@@ -428,13 +479,17 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
             className="h-10"
             placeholder={inputPlaceholder}
             value={draft}
-            disabled={busy}
+            disabled={busy || (historyLoaded && !sessionAlive)}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.nativeEvent.isComposing) void send();
             }}
           />
-          <Button className="h-10 px-4" onClick={() => void send()} disabled={busy || draft.trim().length === 0}>
+          <Button
+            className="h-10 px-4"
+            onClick={() => void send()}
+            disabled={busy || draft.trim().length === 0 || (historyLoaded && !sessionAlive)}
+          >
             <SendHorizonal className="size-4" />
           </Button>
           {!isAnswerMode && (
@@ -461,22 +516,74 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     <div
       className={cn(
         "mx-auto flex h-full flex-col gap-4 p-6",
-        showSidePanel ? "max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5" : "max-w-3xl",
+        showSidePanel
+          ? isGrillMode
+            ? "max-w-[1400px] lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-5"
+            : "max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-5"
+          : "max-w-3xl",
       )}
     >
       {chatColumn}
       {showSidePanel && (
-        <ThinkingPanel
-          text={panelMessage?.role === "interviewer" ? (panelMessage.thinking ?? "") : ""}
-          streaming={
-            busy &&
-            panelIdx === null &&
-            panelMessage?.role === "interviewer" &&
-            panelMessage.thinking.length > 0 &&
-            panelMessage.text.length === 0
-          }
-          seconds={panelMessage?.role === "interviewer" ? (panelMessage.thinkSeconds ?? null) : null}
-        />
+        <aside className="hidden min-h-0 flex-col rounded-[10px] border border-line bg-surface/60 lg:flex lg:h-full">
+          {isGrillMode ? (
+            <>
+              <div className="flex items-center gap-1 border-b border-line px-3 py-2">
+                {(
+                  [
+                    { key: "thinking", label: "思考过程" },
+                    { key: "files", label: "项目文件" },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.key}
+                    className={cn(
+                      "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                      sideTab === option.key
+                        ? "bg-accent-soft text-accent"
+                        : "text-ink-dim hover:bg-surface-2 hover:text-ink",
+                    )}
+                    onClick={() => setSideTab(option.key)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {sideTab === "thinking" ? (
+                <ThinkingPanel
+                  bare
+                  text={panelMessage?.role === "interviewer" ? (panelMessage.thinking ?? "") : ""}
+                  streaming={
+                    busy &&
+                    panelIdx === null &&
+                    panelMessage?.role === "interviewer" &&
+                    panelMessage.thinking.length > 0 &&
+                    panelMessage.text.length === 0
+                  }
+                  seconds={panelMessage?.role === "interviewer" ? (panelMessage.thinkSeconds ?? null) : null}
+                />
+              ) : grillProjectId ? (
+                <FileBrowser projectId={Number(grillProjectId)} />
+              ) : (
+                <p className="p-4 text-xs leading-relaxed text-ink-faint">
+                  该会话缺少项目上下文（旧会话或未带 project 参数），文件浏览不可用。
+                </p>
+              )}
+            </>
+          ) : (
+            <ThinkingPanel
+              text={panelMessage?.role === "interviewer" ? (panelMessage.thinking ?? "") : ""}
+              streaming={
+                busy &&
+                panelIdx === null &&
+                panelMessage?.role === "interviewer" &&
+                panelMessage.thinking.length > 0 &&
+                panelMessage.text.length === 0
+              }
+              seconds={panelMessage?.role === "interviewer" ? (panelMessage.thinkSeconds ?? null) : null}
+            />
+          )}
+        </aside>
       )}
     </div>
   );

@@ -13,6 +13,7 @@
     "@streamdown/math": "^1.0.2",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "jszip": "^3.10.1",
     "lucide-react": "1.35.0",
     "next": "16.3.3",
     "react": "19.2.8",

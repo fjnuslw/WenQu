@@ -271,6 +271,13 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **/api 代理 30s 断连根治**：长 POST（备课 95s）经 next.config rewrites 的 undici fetch 在 ~30s 被 ECONNRESET（web.err.log 实锤；此前"扩采 500"与"备课 500"同因，此前误判为重启撞车）——**/api 弃用 rewrites，改走与 /agents 同构的 node:http Route Handler**（app/api/[...path]/route.ts，keepAlive:false + 逐块转发），95s 长备课经代理实测全程 200。
   - **简历替换与隐私**：DELETE /api/resumes/{id}（行+声明+本地 PDF 文件）；/resume 页 chips 带 × 删除，"替换 = 删除后重新上传"；页头明示"文件只存本地 data/uploads（已 gitignore）"。**隐私核查：data/ 全目录在 .gitignore、git 零跟踪 PDF——用户简历从未进过 GitHub**。
   - **/grilling UI**：双模式 tab（本地目录推荐 / zip 辅助）、项目名可留空自动推导（修复"上传按钮莫名置灰"：此前要求先填项目名）、备课进度文案、repo_root 展示。
+- **2026-08-29 续十二（G1 体验二期：异步备课 + 目录选择器 + 会话持久恢复 + 拷打文件侧栏，用户四点反馈）**：
+  - **诊断"卡住"**：用户备课 `D:\AI_Workspace\weixin` 实际成功但耗时 3-4 分钟且页面零反馈；且微信小程序项目 49,700 文件中 miniprogram_npm 未被排除、md 文档吃光 400KB 收集预算（121 个入选文件 md/yaml 为主，源码反而没进）。
+  - **备课异步化（A）**：POST 立即返回 project_id（status=preparing），asyncio.create_task 后台执行，Project.meta 分步更新（status/step/progress），GET /{id} 轮询；失败落 status=failed+error。前端轮询展示步骤。
+  - **收集器修正（B）**：EXCLUDE_DIRS 补 miniprogram_npm/uni_modules/taro-dist 等；文档类（md/txt）单文件 8KB 截断，预算优先源码。
+  - **文件管理器选择（C）**：`<input webkitdirectory>`（浏览器原生目录选择对话框）+ JSZip 客户端打包 → 走 zip 通道（浏览器安全模型拿不到绝对路径，本地 localhost 上传零成本）；粘贴路径保留为高级方式。
+  - **会话持久化与恢复（D）**：agents 增 GET /sessions（列表：mode/persona/轮数/时间）与 GET /sessions/:id/history（JSONL 重放 user/assistant/tool_use）；ChatRoom 挂载即拉历史（刷新/换设备继续聊，会话在 agents 内存仍存活时直接续）；agents 重启后的历史会话只读回放。
+  - **拷打文件侧栏（E）**：api 增 tree/file 端点（路径监狱）；grill 模式右栏改双 tab（思考过程/项目文件——树浏览+行号查看器）；拷打官回复中的 `文件:行号` 引用渲染为可点击链接 → 打开侧栏对应文件并滚动高亮该行（dsh 式证据可核）。
 
 ## 10. 合规与 License 策略
 

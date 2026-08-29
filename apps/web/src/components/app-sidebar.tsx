@@ -3,6 +3,7 @@
 import {
   Layers,
   LayoutDashboard,
+  History,
   Newspaper,
   Swords,
   UserRoundSearch,
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/grilling", label: "项目拷打", icon: Swords },
   { href: "/resume", label: "简历工作台", icon: UserRoundSearch },
   { href: "/review", label: "复习队列", icon: RotateCcw },
+  { href: "/sessions", label: "会话记录", icon: History },
 ] as const;
 
 export function AppSidebar() {

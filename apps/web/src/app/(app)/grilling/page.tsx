@@ -51,10 +51,12 @@ export default function GrillingPage() {
   const [resumes, setResumes] = useState<ResumeListItem[]>([]);
   const [resumeId, setResumeId] = useState<number | null>(null);
   const [prepping, setPrepping] = useState(false);
+  const [progress, setProgress] = useState<{ step: string; progress: number } | null>(null);
   const [prep, setPrep] = useState<GrillPrep | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dirInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void apiFetch<{ items: ResumeListItem[] }>("/api/resumes")
@@ -84,11 +86,76 @@ export default function GrillingPage() {
         const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
         throw new Error(body?.error?.message ?? `备课失败: ${response.status}`);
       }
-      setPrep((await response.json()) as GrillPrep);
+      const started = (await response.json()) as { project_id: number };
+      await pollPreparation(started.project_id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setPrepping(false);
+    }
+  }
+
+  /** 轮询备课进度（后端分钟级异步任务；详情接口就绪前返回 status/step/progress）。 */
+  async function pollPreparation(projectId: number) {
+    for (let attempt = 0; attempt < 240; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      const data = await apiFetch<
+        GrillPrep & { status?: string; step?: string; progress?: number; error?: string | null }
+      >(`/api/grill/projects/${projectId}`);
+      if (data.status === "failed") {
+        throw new Error(`备课失败：${data.error ?? "未知错误"}`);
+      }
+      setProgress({ step: data.step ?? "备课中", progress: data.progress ?? 0 });
+      if (data.status === "ready" && data.briefing) {
+        setPrep(data);
+        setProgress(null);
+        return;
+      }
+    }
+    throw new Error("备课超时（10 分钟）——项目可能过大，请查看后端日志");
+  }
+
+  /** 浏览器目录选择（webkitdirectory）→ 客户端 zip（JSZip）→ zip 备课通道。
+   *  浏览器安全模型拿不到绝对路径，本地 localhost 上传零成本。 */
+  async function prepareDirectory(fileList: FileList) {
+    const first = fileList[0];
+    if (!first) return;
+    const rootName = (first.webkitRelativePath || "selected-dir").split("/")[0] || "selected-dir";
+    setPrepping(true);
+    setError(null);
+    setPrep(null);
+    setProgress({ step: "浏览器打包中", progress: 2 });
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      const skipped = new Set([
+        "node_modules", ".git", "miniprogram_npm", ".venv", "venv", "dist", "build",
+        "unpackage", "uni_modules", "__pycache__", ".next",
+      ]);
+      for (const file of Array.from(fileList)) {
+        const rel = (file.webkitRelativePath || file.name).split("/").slice(1).join("/");
+        if (!rel || file.size > 512 * 1024) continue; // 大文件多为构建产物
+        if (rel.split("/").slice(0, -1).some((part) => skipped.has(part))) continue;
+        zip.file(rel, file);
+      }
+      const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+      const form = new FormData();
+      form.append("file", new File([blob], `${rootName}.zip`, { type: "application/zip" }));
+      form.append("name", name.trim() || rootName);
+      if (resumeId !== null) form.append("resume_id", String(resumeId));
+      const response = await fetch("/api/grill/projects", { method: "POST", body: form });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(body?.error?.message ?? `备课失败: ${response.status}`);
+      }
+      const started = (await response.json()) as { project_id: number };
+      await pollPreparation(started.project_id);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      setProgress(null);
+    } finally {
+      setPrepping(false);
+      if (dirInputRef.current) dirInputRef.current.value = "";
     }
   }
 
@@ -111,9 +178,11 @@ export default function GrillingPage() {
         const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
         throw new Error(body?.error?.message ?? `备课失败: ${response.status}`);
       }
-      setPrep((await response.json()) as GrillPrep);
+      const started = (await response.json()) as { project_id: number };
+      await pollPreparation(started.project_id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
+      setProgress(null);
     } finally {
       setPrepping(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -147,7 +216,7 @@ export default function GrillingPage() {
         throw new Error(body?.error?.message ?? `创建拷打会话失败: ${response.status}`);
       }
       const { id } = (await response.json()) as { id: string };
-      router.push(`/interview/${id}?mode=grill`);
+      router.push(`/interview/${id}?mode=grill&project=${prep.project_id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -187,25 +256,47 @@ export default function GrillingPage() {
           </div>
 
           {mode === "dir" ? (
-            <div className="space-y-1.5">
-              <label className="text-xs text-ink-dim" htmlFor="project-dir">
-                项目目录绝对路径（服务端原位读取，不拷贝不上传）
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="project-dir"
-                  placeholder="D:\projects\my-agent"
-                  value={localPath}
-                  onChange={(event) => setLocalPath(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !prepping) void prepareDir();
-                  }}
-                />
-                <Button onClick={() => void prepareDir()} disabled={prepping || !localPath.trim()}>
+            <div className="space-y-2.5">
+              <input
+                ref={dirInputRef}
+                type="file"
+                className="hidden"
+                // @ts-expect-error 浏览器专有属性：原生目录选择对话框
+                webkitdirectory=""
+                directory=""
+                multiple
+                onChange={(event) => {
+                  const files = event.target.files;
+                  if (files && files.length > 0) void prepareDirectory(files);
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={() => dirInputRef.current?.click()} disabled={prepping}>
                   <FolderOpen className={prepping ? "size-4 animate-pulse" : "size-4"} />
-                  {prepping ? "备课中…" : "备课"}
+                  {prepping ? "处理中…" : "选择项目文件夹…"}
                 </Button>
+                <span className="text-[11px] text-ink-faint">
+                  系统文件管理器选目录 → 浏览器打包上传（node_modules 等自动过滤）
+                </span>
               </div>
+              <details className="text-[11px] text-ink-faint">
+                <summary className="cursor-pointer select-none hover:text-ink-dim">
+                  高级：粘贴服务器本地路径（原位读取，零上传）
+                </summary>
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    placeholder="D:\projects\my-agent（绝对路径）"
+                    value={localPath}
+                    onChange={(event) => setLocalPath(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !prepping && localPath.trim()) void prepareDir();
+                    }}
+                  />
+                  <Button variant="secondary" onClick={() => void prepareDir()} disabled={prepping || !localPath.trim()}>
+                    原位备课
+                  </Button>
+                </div>
+              </details>
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -223,7 +314,7 @@ export default function GrillingPage() {
               <div>
                 <Button onClick={() => fileInputRef.current?.click()} disabled={prepping}>
                   <Upload className={prepping ? "size-4 animate-pulse" : "size-4"} />
-                  {prepping ? "备课中（1-3 分钟）…" : "选择 zip 并备课"}
+                  {prepping ? "备课中…" : "选择 zip 并备课"}
                 </Button>
               </div>
             </div>
@@ -262,9 +353,21 @@ export default function GrillingPage() {
             </div>
           </div>
           {prepping && (
-            <p className="text-xs text-ink-dim">
-              正在读码备课：收集文件 → 生成模块清单与拷打题{resumeId !== null ? " → 简历声明对照" : ""}（大仓库 1-3 分钟，请勿关闭页面）。
-            </p>
+            <div className="space-y-2 rounded-lg border border-accent/25 bg-accent-soft/40 px-3.5 py-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-ink">{progress?.step ?? "提交备课任务…"}</span>
+                <span className="font-mono text-accent">{progress ? `${progress.progress}%` : "…"}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-500"
+                  style={{ width: `${Math.max(3, progress?.progress ?? 3)}%` }}
+                />
+              </div>
+              <p className="text-[11px] leading-relaxed text-ink-faint">
+                读码 → 分批 LLM 备课 → {resumeId !== null ? "简历声明对照 → " : ""}完成。大仓库需要几分钟，进度实时更新，可以离开本页稍后在下面列表里回来。
+              </p>
+            </div>
           )}
           {error && <p className="text-sm text-danger">出错了：{error}</p>}
         </CardContent>
