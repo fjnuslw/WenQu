@@ -326,3 +326,12 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 | Anki | genanki | MIT | L1 |
 | 语音 | LiveKit Agents SDK | Apache-2.0 | P1 |
 | 基础设施 | pgvector / Meilisearch / Redis(arq) | PostgreSQL/MIT/BSD | P0 ✅ |
+
+## 2026-08-30 续十八（面经渠道扩充：牛客多话题 / CSDN / linux.do RSS / 人工摘录）
+
+- **牛客多话题**：从单一“大模型面经”扩为 4 个逐页人工确认的真实话题（大模型面经、Agent 面经、AI 项目拷打、实习面试记录），仍保持 8 秒最小间隔。为避免第一个首页吃满配额，按剩余条数/剩余话题动态分配配额。实测 `?type=new&page=1/2/3` 的 16 条帖子 URL 集合完全相同，SSR 忽略 `page`；因此只采各话题最新首页，不猜测滚动接口。牛客偶发返回 HTTP 200 的约 6KB 空壳，允许同 URL 一次受限重试，两次仍无 feed 则抛 `UpstreamError`。robots 允许 subject/feed，`/search` 实测被 `ComplianceViolation` 拒绝。
+- **CSDN 精选**：新增 `csdn` 渠道，12 秒最小间隔；`blog.csdn.net` robots 门禁允许已审核文章路径，正文稳定 SSR 在 `#content_views`，统一用 selectolax DOM 提取。只选单公司/个人面经，避免把多家公司汇总误并为一场；只在 `raw_text` 内部检索并保留原帖 URL，不生成正文转载页。3 篇首次采集全部入库，立即重跑 3 条全部去重。
+- **linux.do RSS**：`linux-do` 改为依次尝试 `top.rss` / `latest.rss`，XML 用标准库解析；若正文 JSON 被 CF 拦则只用 RSS 摘要并显式写入 meta。2026-08-30 实测两个 RSS 均为 Cloudflare 403，端点返回明确的 502 `upstream_error`，没有指纹、cookie、登录态或其他绕过。
+- **知乎评估**：对公开回答页走 PoliteClient 实测，robots 明确禁止 `/question/.../answer/...`，故不注册自动渠道。知乎内容仍可通过人工摘录端点进入。
+- **人工摘录闭环**：新增 `POST /api/ingest/collect/manual`，支持小红书/知乎/脉脉/朋友分享四种来源；只消费用户提交的文本、可选溯源 URL 和日期，绝不请求原站。自动采集与人工文本共用 `ingest_post_previews`，因此共享 LLM 忠实抽取、公司词表匹配、content_hash 幂等和问题树入库；人工确认日期优先于模型推断。`/experiences` 新增“人工摘录”弹层，导入后刷新来源 tab。
+- **数据与验收**：本轮后共 20 条面经：牛客 16（公司匹配 10、主问题 164、追问 10），CSDN 3（匹配 2、主问题 90），小红书人工摘录 1（匹配 1、主问题 3、追问 1）。真实端点首次/重跑分别验证新增与 `inserted=0`；资料广告样例返回 `skipped_non_experience=1`。后端 11 项 pytest、ruff、py_compile、前端 TypeScript 与 Next production build 全部通过；浏览器验证人工来源 tab、日期与追问树正常。
