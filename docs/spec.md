@@ -202,7 +202,7 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 | **P0 基座** | 三服务脚手架、docker-compose、核心数据模型+Alembic、LLM 网关、设计令牌与 UI 壳、pi 运行时接入、一键启停脚本 | api 启动建表；agents 可开 session 对话；web 壳可导航 | ✅ 2026-08-28（全栈实测：stop/start 幂等循环、健康检查、pi 集成 tsc 零错误） |
 | **K1 知识核心** | F1 导入器（11 源注册+license 门禁）+ 增量导入（source_files 收敛记账）+ LLM 结构化抽取（思考开关/大 max_tokens）+ Meili 索引与全文检索 + F2 题库查询/标签/公司筛选 + **厂商分类管道**（24 厂商种子 + AI 推断标注 + 词表硬校验）+ **算法题接入**（kind=algorithm + "算法"标签族 + LeetCode Hot100 种子，供 I1 面试现场手撕调用） | 题库 ≥3000、面经 ≥500（§3 表格）；导入幂等可增量重跑 | ✅ 2026-08-29 管道全线打通并实测（faq-of-llm-interview 首源 128 文件；其余源经 `scripts/import_source.py --all` 后台持续灌库；厂商标注 AI 推断 freq=1，待面经挖掘校准） |
 | **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官从题库组卷（含 kind=algorithm 手撕抽题）** | 30 分钟模拟面试+报告达 §4 验收 | ✅ 2026-08-29 全链路实测：组卷 v2（公司频率榜 ∪ 简历考点押题 → LLM 定卷硬校验 + 面经追问素材 + 考察简报）→ agents 题单驱动面试（0.8-1.3s/轮，简报/简历要点/probes 首轮导演指令注入）→ 评分报告（rubric 五维+原话证据）→ 失分点自动回流 SM-2（续九）。简历解析管道 + 开始表单简历选择器已上线 |
-| **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | 🟡 **v1 落地（2026-08-29 续十）**：zip→备课（模块/三类拷打题/声明对照质证清单）→ 只读工具面拷打（路径监狱）→ 查证式追问实测。待做：题库/面经素材注入开关、报告证据链（文件:行号）、tree-sitter repo map、pgvector 语义检索、git URL 通道、历史会话回显 |
+| **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | ✅ **v1 全链路落地（2026-08-29/30 续十～十五）**：备课（目录/zip+异步进度）→ 声明质证 → 拷打（架构重心+自动开场+真读码审计+file:line 可点击核证）→ **证据链报告**（评分维度与失分点必带候选人原话/代码位置证据，浏览器渲染引用块+可点击定位，失分点回流 SM-2 保留锚点）。v2 待做：tree-sitter repo map、pgvector 语义检索、git URL 通道与归属分析、Anki 导出 |
 | **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | 🟡 进行中：**SM-2 失分点回流已落地**（review_items + /review 页 + 报告自动回流，续九）；待做：掌握度统计、Anki 导出（genanki）、JD 匹配度、Dashboard 完整版 |
 | **P1 公开化** | 多用户、UGC 爆料、语音（LiveKit）、岗位聚合评估 | 按 §10 合规重审 | 未开始 |
 
@@ -285,6 +285,12 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **会话记录归位**：删除独立 /sessions 页（"太散"）——mock 会话进「模拟面试」页的"最近面试"板块，grill 会话进「项目拷打」页各项目卡片内（按 projectName 分组）；数据源不变（agents /sessions 列表）。
   - **已备课项目管理（dsh 式）**：GET /api/grill/projects 列表丰富化（status/file_count/时间/备课摘要）+ DELETE /api/grill/projects/{id}（库行 + artifacts + zip 解压目录；local_path 原位项目只删库不删目录）；项目卡片支持 一键再开拷打（复用已存 briefing，无需重备课）/ 查看备课 / 删除。
   - **全局字体收敛**：页面里 text-[11px]/text-[10px]/badge 堆叠导致层级混乱——统一为三级信息行（主 sm-medium-ink / 次 xs-ink-dim / 元 xs-ink-faint），非状态信息从徽章降为分隔点文字，收紧字号梯度。
+- **2026-08-30 续十五（G1 收官：证据链报告）**：
+  - **schema**：`EvidenceRef{kind: quote|code, quote, file, line}`；ReportScoreItem 与 weaknesses（WeaknessItem）必带 evidence；评分 prompt 升级——每条论断配**候选人原话逐字摘录**或对话中拷打官引用的 `文件:行号`（禁止臆造，须能在记录中逐字找到）。
+  - **web 渲染**：报告面板每维度/失分点下渲染证据——原话=引用块，代码位置=可点击按钮（grill 会话点击跳侧栏文件定位）。
+  - **回流**：失分点文本并入代码锚点（"…（见 apps/agents/src/session.ts:183）"）进 SM-2 复习队列，复习时可回看现场。
+  - **E2E（wenqu2 两轮拷打会话）**：设计决策质量 2/5 挂证据 ["SSE 写得慢只是背压，事件都在内存里排着。"（原话）+ session.ts:183（代码）]；诚实度/理解深度等维度全部带原话；失分点"未主动识别缺失 AbortSignal"带代码锚点回流。浏览器实测证据引用块与可点击位置完整渲染。
+  - 提交：a2b0177。**G1 里程碑 v1 收口** ✅。
 
 ## 10. 合规与 License 策略
 
