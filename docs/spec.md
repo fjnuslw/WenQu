@@ -333,9 +333,10 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **CSDN 精选**：新增 `csdn` 渠道，12 秒最小间隔；`blog.csdn.net` robots 门禁允许已审核文章路径，正文稳定 SSR 在 `#content_views`，统一用 selectolax DOM 提取。只选单公司/个人面经，避免把多家公司汇总误并为一场；只在 `raw_text` 内部检索并保留原帖 URL，不生成正文转载页。3 篇首次采集全部入库，立即重跑 3 条全部去重。
 - **linux.do RSS**：`linux-do` 改为依次尝试 `top.rss` / `latest.rss`，XML 用标准库解析；若正文 JSON 被 CF 拦则只用 RSS 摘要并显式写入 meta。2026-08-30 实测两个 RSS 均为 Cloudflare 403，端点返回明确的 502 `upstream_error`，没有指纹、cookie、登录态或其他绕过。
 - **知乎评估**：对公开回答页走 PoliteClient 实测，robots 明确禁止 `/question/.../answer/...`，故不注册自动渠道。知乎内容仍可通过人工摘录端点进入。
-- **人工摘录闭环**：新增 `POST /api/ingest/collect/manual`，支持小红书/知乎/脉脉/朋友分享四种来源；只消费用户提交的文本、可选溯源 URL 和日期，绝不请求原站。自动采集与人工文本共用 `ingest_post_previews`，因此共享 LLM 忠实抽取、公司词表匹配、content_hash 幂等和问题树入库；人工确认日期优先于模型推断。`/experiences` 新增“人工摘录”弹层，导入后刷新来源 tab。
+- **人工摘录闭环**：新增 `POST /api/ingest/collect/manual`，支持小红书/抖音/知乎/脉脉/朋友分享五种来源；只消费用户提交的文本、可选溯源 URL 和日期，绝不请求原站。自动采集与人工文本共用 `ingest_post_previews`，因此共享 LLM 忠实抽取、公司词表匹配、content_hash 幂等和问题树入库；人工确认日期优先于模型推断。`/experiences` 新增“人工摘录”弹层，导入后刷新来源 tab。
 - **数据与验收**：本轮后共 20 条面经：牛客 16（公司匹配 10、主问题 164、追问 10），CSDN 3（匹配 2、主问题 90），小红书人工摘录 1（匹配 1、主问题 3、追问 1）。真实端点首次/重跑分别验证新增与 `inserted=0`；资料广告样例返回 `skipped_non_experience=1`。后端 11 项 pytest、ruff、py_compile、前端 TypeScript 与 Next production build 全部通过；浏览器验证人工来源 tab、日期与追问树正常。
 - **用户授权后的浏览器辅助扩充**：用户明确授权后，通过已登录的可见浏览器低频逐帖检索与翻图识别，没有新增小红书自动采集器、隐藏接口调用、Cookie 提取或无人值守翻页。人工审核并导入京东、字节、腾讯、百度、面壁智能、淘天、小红书、地平线 8 篇真实面经，首次全部 `inserted=1`，原样重跑全部 `duplicates=1, inserted=0`。当前共 28 条面经，其中 `manual-xhs` 9 条、153 个主问题和 1 个追问；`/experiences` 实测来源 tab 为 `小红书人工摘录 9`，筛选结果 `9/28`。图片密集长帖仍受单篇 30 题 schema 上限约束，面壁智能 9 图中的后续问题已在交接总结列为遗留，未伪造或静默拆成多场面试。
+- **小红书第二批与抖音人工扩充**：小红书第二批再导入 15 篇、254 个主问题；用户完成抖音登录后，以同样的可见浏览器低频逐帖方式审核腾讯、美团、字节、米哈游、联想、大疆、哔哩哔哩、美的和一条真实小公司 Agent 岗记录，共导入 9 篇、114 个主问题。抖音批次首次均 `inserted=1`，原样重跑均 `duplicates=1, inserted=0`。当前共 52 条面经，`manual-xhs` 24 条、`manual-douyin` 9 条；页面实测显示 `52/52`、来源 tab `抖音人工摘录 9`，每条保留可跳转原帖。全程未访问隐藏接口、Cookie 或本地存储，也未把浏览器步骤写成自动采集器。
 
 ## 2026-08-30 续十九（27 届秋招官方网申入口进题库）
 
