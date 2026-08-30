@@ -52,6 +52,8 @@ const MANUAL_SOURCES = [
   "小红书人工摘录",
   "抖音人工摘录",
   "知乎人工摘录",
+  "Reddit 人工摘录",
+  "linux.do 人工摘录",
   "脉脉人工摘录",
   "朋友分享",
 ];
@@ -357,8 +359,16 @@ export default function ExperiencesPage() {
     setFetching(true);
     setError(null);
     try {
-      const result = await apiFetch<ExperienceList>("/api/experiences?limit=100");
-      setData(result);
+      const firstPage = await apiFetch<ExperienceList>("/api/experiences?limit=100");
+      const items = [...firstPage.items];
+      while (items.length < firstPage.total) {
+        const nextPage = await apiFetch<ExperienceList>(
+          `/api/experiences?limit=100&offset=${items.length}`,
+        );
+        if (nextPage.items.length === 0) break;
+        items.push(...nextPage.items);
+      }
+      setData({ total: firstPage.total, items });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {

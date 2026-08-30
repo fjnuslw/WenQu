@@ -30,6 +30,8 @@ _MANUAL_SPECS = (
     _manual_spec("manual-xhs", "小红书人工摘录", "xiaohongshu"),
     _manual_spec("manual-douyin", "抖音人工摘录", "douyin"),
     _manual_spec("manual-zhihu", "知乎人工摘录", "zhihu"),
+    _manual_spec("manual-reddit", "Reddit 人工摘录", "reddit"),
+    _manual_spec("manual-linux-do", "linux.do 人工摘录", "linux-do"),
     _manual_spec("manual-maimai", "脉脉人工摘录", "maimai"),
     _manual_spec("manual-friend", "朋友分享", "friend-share"),
 )
@@ -39,6 +41,9 @@ _BY_NAME.update(
         "小红书": _BY_NAME["小红书人工摘录"],
         "抖音": _BY_NAME["抖音人工摘录"],
         "知乎": _BY_NAME["知乎人工摘录"],
+        "Reddit": _BY_NAME["Reddit 人工摘录"],
+        "reddit": _BY_NAME["Reddit 人工摘录"],
+        "linux.do": _BY_NAME["linux.do 人工摘录"],
         "脉脉": _BY_NAME["脉脉人工摘录"],
     }
 )

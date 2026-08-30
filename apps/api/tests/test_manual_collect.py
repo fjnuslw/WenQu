@@ -13,6 +13,13 @@ from getoffer.ingest.collect.manual import get_manual_channel
         ("小红书", "manual-xhs"),
         ("抖音人工摘录", "manual-douyin"),
         ("抖音", "manual-douyin"),
+        ("知乎人工摘录", "manual-zhihu"),
+        ("知乎", "manual-zhihu"),
+        ("Reddit 人工摘录", "manual-reddit"),
+        ("Reddit", "manual-reddit"),
+        ("reddit", "manual-reddit"),
+        ("linux.do 人工摘录", "manual-linux-do"),
+        ("linux.do", "manual-linux-do"),
     ),
 )
 def test_get_manual_channel_maps_social_sources(source_name: str, expected_slug: str) -> None:

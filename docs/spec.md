@@ -355,3 +355,12 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **补题**：新增 `interview-python` 源（taizilongxu/interview_python，17k star，无 license → STEMS_ONLY 仅取题干），导入 +133 题。
 - **合规否决记录**：guoguo-tju/agent_java_offer（Java 后端+AI）为 CC BY-NC 4.0 → 按 sources.py 门禁 REFERENCE_ONLY 禁入；Snailclimb/JavaGuide（Apache-2.0 合规）主体为泛 Java 后端八股，**因不贴合大模型应用场景主动否决**；resumejob/interview-questions 内容已整体迁往商业站 osjobs.net，GitHub 仅剩链接目录，不作源。
 - **前端**：题库页标签 chips 由"top 18"改为"计数 ≥20 全展示"，四个新分类直接露出（低频杂项仍截掉）。
+
+## 2026-08-30 续二十一（面经扩充至 106 条：知乎 / Reddit / 牛客）
+
+- **数据规模**：面经由 73 条扩充至 **106 条**，共 1443 个主问题、12 个追问节点。来源分布：牛客 30、知乎人工摘录 25、小红书人工摘录 24、抖音人工摘录 22、CSDN 3、Reddit 人工摘录 2。
+- **知乎处理口径**：继续使用用户已登录的可见浏览器低频阅读。个人长文《国内大模型公司，粗略面经+感受+一些包裹》本身逐公司成章，17 个包含实际问题的公司章节显式拆为独立面经；同一公司的多轮仍合并在一条记录中。简历挂、失约和没有具体问题的章节不入库。
+- **Reddit 新来源**：人工通道新增 `manual-reddit`，首批核验 SarvamAI ML Engineer 与 Cloudflare AI Engineer 两篇个人经历，共 21 个主问题；跳过 Reddit AI 摘要、求助帖与泛讨论。原帖 URL 只用于溯源，后端不访问 Reddit。
+- **linux.do 边界**：新增 `manual-linux-do` 作为人工文本入口。自动 `top.rss` / `latest.rss` 与 JSON 仍受 Cloudflare 403；本轮可见搜索又返回操作频率限制，因此停止重试，不带 Cookie、不做挑战绕过，新增数为 0。
+- **合规补量**：牛客四个已确认话题按 robots 门禁与 8 秒间隔运行 `max_posts=30`，新增 14、重复 9、跳过资料/非面经 7；原样复跑为重复 23、跳过 7、新增 0。
+- **超过 100 条后的页面修复**：读取 API 单页上限为 100。面经页改为按 `offset` 连续取页直至取满 `total`，确保页面、来源 tab 与公司筛选基于完整 106 条，而非只统计最新 100 条；人工摘录下拉同步加入 Reddit 与 linux.do。
