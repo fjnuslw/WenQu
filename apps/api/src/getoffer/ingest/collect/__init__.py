@@ -20,12 +20,12 @@ def _build_channels() -> dict[str, ChannelSpec]:
         ),
         ChannelSpec(
             slug="linux-do",
-            name="linux.do（Discourse 公开帖）",
+            name="linux.do（公开 RSS）",
             base_url="https://linux.do",
             license_note="公开UGC（署名+原帖链接）；Cloudflare 挑战时显式失败",
             min_interval=10.0,
             fetch_posts=fetch_linux_do_posts,
-            notes="游客 JSON API；Agent/RAG 帖质量高，受 CF 防护限制",
+            notes="top/latest RSS 优先；正文 JSON 受 CF 限制时仅使用 RSS 摘要并明确标注",
         ),
         ChannelSpec(
             slug="csdn",
