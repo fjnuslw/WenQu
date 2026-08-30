@@ -28,6 +28,7 @@ def _manual_spec(slug: str, name: str, provenance: str) -> ChannelSpec:
 
 _MANUAL_SPECS = (
     _manual_spec("manual-xhs", "小红书人工摘录", "xiaohongshu"),
+    _manual_spec("manual-douyin", "抖音人工摘录", "douyin"),
     _manual_spec("manual-zhihu", "知乎人工摘录", "zhihu"),
     _manual_spec("manual-maimai", "脉脉人工摘录", "maimai"),
     _manual_spec("manual-friend", "朋友分享", "friend-share"),
@@ -36,6 +37,7 @@ _BY_NAME = {spec.name: spec for spec in _MANUAL_SPECS}
 _BY_NAME.update(
     {
         "小红书": _BY_NAME["小红书人工摘录"],
+        "抖音": _BY_NAME["抖音人工摘录"],
         "知乎": _BY_NAME["知乎人工摘录"],
         "脉脉": _BY_NAME["脉脉人工摘录"],
     }

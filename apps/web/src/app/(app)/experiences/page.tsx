@@ -48,7 +48,13 @@ interface CollectReport {
   unmatched_companies: string[];
 }
 
-const MANUAL_SOURCES = ["小红书人工摘录", "知乎人工摘录", "脉脉人工摘录", "朋友分享"];
+const MANUAL_SOURCES = [
+  "小红书人工摘录",
+  "抖音人工摘录",
+  "知乎人工摘录",
+  "脉脉人工摘录",
+  "朋友分享",
+];
 
 const COLLAPSED_QUESTIONS = 3;
 
