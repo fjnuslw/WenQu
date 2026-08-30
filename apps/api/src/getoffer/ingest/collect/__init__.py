@@ -2,6 +2,7 @@
 
 from getoffer.errors import NotFound
 from getoffer.ingest.collect.base import ChannelSpec, PostPreview  # noqa: F401 (re-export)
+from getoffer.ingest.collect.csdn import fetch_csdn_posts
 from getoffer.ingest.collect.linux_do import fetch_linux_do_posts
 from getoffer.ingest.collect.nowcoder import fetch_nowcoder_posts
 
@@ -25,6 +26,15 @@ def _build_channels() -> dict[str, ChannelSpec]:
             min_interval=10.0,
             fetch_posts=fetch_linux_do_posts,
             notes="游客 JSON API；Agent/RAG 帖质量高，受 CF 防护限制",
+        ),
+        ChannelSpec(
+            slug="csdn",
+            name="CSDN·大模型面经精选",
+            base_url="https://blog.csdn.net",
+            license_note="公开文章（保留原帖链接，仅内部结构化检索，不对外转载正文）",
+            min_interval=12.0,
+            fetch_posts=fetch_csdn_posts,
+            notes="已人工审核的单公司/个人面经种子；SSR 正文经 selectolax DOM 解析",
         ),
     ]
     return {spec.slug: spec for spec in specs}
