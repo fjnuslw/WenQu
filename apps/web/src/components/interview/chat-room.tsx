@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, SendHorizonal } from "lucide-react";
+import { FileText, Mic, MicOff, SendHorizonal, Volume2, VolumeX } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { agentsUrl, apiFetch } from "@/lib/api";
 import { INTERVIEW_PHASES } from "@/lib/phases";
+import { useSpeechRecognition, useSpeechSynthesis } from "@/hooks/use-speech";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -348,6 +349,12 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     window.dispatchEvent(new CustomEvent("wenqu:open-file", { detail: { path, line } }));
   }, []);
 
+  // 语音（spec 续十七）：麦克风实时转写进输入框；TTS 朗读面试官回复（可开关）
+  const speech = useSpeechRecognition((finalText) => {
+    setDraft((current) => (current ? `${current} ${finalText}` : finalText));
+  });
+  const tts = useSpeechSynthesis();
+
   // 思考栏默认跟随最新有思考内容的消息；点击气泡可回看历史思考
   const lastThinkingIdx = (() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -453,6 +460,11 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
     } finally {
       setBusy(false);
       scrollToEnd();
+      setMessages((current) => {
+        const last = current[current.length - 1];
+        if (last?.role === "interviewer" && last.text) tts.speak(last.text);
+        return current;
+      });
     }
   }
 
@@ -553,6 +565,26 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
               if (event.key === "Enter" && !event.nativeEvent.isComposing) void send();
             }}
           />
+          {speech.supported && (
+            <Button
+              variant={speech.listening ? "danger" : "secondary"}
+              className="h-10 px-3"
+              onClick={() => (speech.listening ? speech.stop() : speech.start())}
+              title={speech.listening ? "停止录音（转写已进输入框，可编辑后发送）" : "按住思路说话：实时转写进输入框"}
+            >
+              {speech.listening ? <MicOff className="size-4 animate-pulse" /> : <Mic className="size-4" />}
+            </Button>
+          )}
+          {tts.supported && (
+            <Button
+              variant={tts.enabled ? "default" : "secondary"}
+              className="h-10 px-3"
+              onClick={() => tts.setEnabled((value) => !value)}
+              title={tts.enabled ? "朗读已开：面试官回复自动语音播报，点此关闭" : "开启语音播报（面试官回复朗读）"}
+            >
+              {tts.enabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+            </Button>
+          )}
           <Button
             className="h-10 px-4"
             onClick={() => void send()}
@@ -573,6 +605,11 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
             </Button>
           )}
         </div>
+        {(speech.listening || speech.error) && (
+          <p className={`mt-2 text-xs ${speech.error ? "text-danger" : "text-accent"}`}>
+            {speech.error ?? (speech.interim ? `识别中：${speech.interim}` : "聆听中…（说完点麦克风停止，转写可编辑）")}
+          </p>
+        )}
         <p className="mt-2 text-center text-xs text-ink-faint">
           <span className="kbd">Enter</span> 发送 · {isAnswerMode ? "max 档深度思考 + 联网核实" : isGrillMode ? "拷打官可实时读你的代码查证（只读工具面）" : "阶段推进与追问深度由确定性状态机控制"} · 支持完整 markdown/公式渲染
         </p>

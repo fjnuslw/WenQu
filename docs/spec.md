@@ -298,6 +298,8 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
   - **Dashboard 完整版**（`GET /api/stats`）：题库总量/track 分布、面经数、复习队列（到期/总数/已掌握）、覆盖岗位大类——真实数据卡片（22,679 题/13 面经）+ 复习引导语按到期数自适应。
   - **打磨**：README 重写功能全景（六模块入口表 + 代理配置说明）；全部服务重启 E2E 通过。
   - 提交：本笔。**L1 里程碑收口** ✅——四条里程碑（K1/I1/G1/L1）全部达成。
+- **2026-08-30 续十七（P1 语音 v1：浏览器原生方案，用户驱动）**：
+  - **调研结论**：原计划 LiveKit Agents SDK 对本地单用户平台过重（需服务器编排）。2026-08-30 复核：**SpeechSynthesis（TTS）** 主流浏览器广泛支持、zh-CN 音色可用、零依赖零成本（[MDN](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Speech_API/Using_the_Web_Speech_API)、[张鑫旭](https://www.zhangxinxu.com/wordpress/2017/01/html5-speech-recognition-synthesis-api/)）；**SpeechRecognition（ASR）** Chrome/Edge 支持中文实时转写，识别请求由 Google/Azure 云处理（需网络，[Chrome 官方](https://developer.chrome.com/blog/voice-driven-web-apps-introduction-to-the-web-speech-api?hl=zh-cn)）。v1 定案：**纯前端 Web Speech API**——语音输入（麦克风按钮 + 实时转写进输入框）+ TTS 朗读面试官回复（可开关），零后端改动；浏览器不支持时诚实隐藏（功能检测，非报错）。v2 若需离线/高精度 ASR 再评估 whisper.cpp 本地或云 ASR。
 
 ## 10. 合规与 License 策略
 
