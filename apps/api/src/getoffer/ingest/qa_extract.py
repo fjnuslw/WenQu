@@ -24,6 +24,11 @@ TAG_FAMILIES = [
     "场景设计",
     "HR面",
     "机器学习基础",
+    "安全",
+    "Python",
+    "Java",
+    "后端工程",
+    "项目深挖",
 ]
 
 QuestionKind = str  # knowledge | handwritten_code | algorithm | scenario | behavior（由 QAItem Literal 约束）
@@ -31,18 +36,29 @@ QuestionKind = str  # knowledge | handwritten_code | algorithm | scenario | beha
 TRACKS = ["大模型应用", "大模型算法", "大模型应用算法", "视觉算法", "通用基础"]
 
 TRACK_GUIDE = """岗位大类判定：
-- 大模型应用：Agent/RAG/MCP/多智能体/Prompt 工程/评测落地/推理部署等工程与系统实现题（通常说的 Agent 应用就在这类）
+- 大模型应用：Agent/RAG/MCP/多智能体/Prompt 工程/评测落地/推理部署等工程与系统实现题
+  （通常说的 Agent 应用就在这类）
 - 大模型算法：预训练/SFT/RLHF/强化学习/蒸馏/模型结构(注意力/位置编码)/解码采样/Scaling 等训练与原理题
 - 大模型应用算法：应用侧的算法问题（检索算法/重排/embedding 微调/RAG 评测算法/Agent 规划/数据合成）
 - 视觉算法：CV 经典与视觉模型题（图像分类/检测/分割/CNN/ViT/多模态视觉理解）
-- 通用基础：LeetCode 算法、计算机网络/操作系统等工程基础、HR 面（机器学习/CV 基础请优先归入机器学习基础或视觉算法）"""
+- 通用基础：LeetCode 算法、Python/Java 等语言基础、计算机网络/操作系统等后端通用工程基础、
+  HR 面（机器学习/CV 基础请优先归入机器学习基础或视觉算法）
+
+标签补充口径（贴合大模型应用场景，spec 续二十）：
+- Python/Java/后端工程 只标"大模型应用/Agent 开发岗真实会问的工程基础"
+  （如 GIL、asyncio、流式生成器、并发服务化、缓存与消息队列、网络与 OS 常识）；
+  与 AI 场景无关的泛后端八股（Spring/JVM/SSM/泛型等）不要标这些标签。
+- 项目深挖：关于"你的项目"的追问式问题（遇到什么问题/为什么这样设计/怎么优化）。"""
 
 
 class QAItem(BaseModel):
     stem: str = Field(min_length=6, max_length=500)
     answer: str | None = None
     tags: list[str] = Field(default_factory=list, max_length=6)
-    kind: str = Field(default="knowledge", pattern="^(knowledge|handwritten_code|algorithm|scenario|behavior)$")
+    kind: str = Field(
+        default="knowledge",
+        pattern="^(knowledge|handwritten_code|algorithm|scenario|behavior)$",
+    )
     track: str | None = Field(
         default=None, pattern="^(大模型应用|大模型算法|大模型应用算法|视觉算法|通用基础)$"
     )
@@ -58,7 +74,8 @@ EXTRACTION_SYSTEM = f"""你是题库数据工程师。输入是来自开源面�
 - stem：问题原文（事实性题干，保留原意，去掉 markdown 记号与编号）
 - answer：该来源给出的答案要点（允许压缩；来源没有答案则留空）
 - tags：从以下词表中选 1-3 个：{'、'.join(TAG_FAMILIES)}
-- kind：knowledge（知识八股）/ handwritten_code（手撕代码）/ algorithm（LeetCode 类算法题）/ scenario（场景设计）/ behavior（行为面）
+- kind：knowledge（知识八股）/ handwritten_code（手撕代码）/ algorithm（LeetCode 类算法题）/
+  scenario（场景设计）/ behavior（行为面）
 - track：岗位大类，从以下词表选 1 个：{'、'.join(TRACKS)}
 - difficulty：1-5
 

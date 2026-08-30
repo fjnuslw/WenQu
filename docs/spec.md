@@ -344,3 +344,12 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **API**：`GET /api/companies` 每项新增 `career_url` / `career_note`。
 - **UI（题库页）**：公司瓷片下方新增「网申 ↗」直达（按钮与链接平级，避免 button 嵌套 a 的无效 HTML）；0 题但带网申入口的公司也展示（DeepSeek/MiniMax 等暂无题可先投递）；「按厂商」栏右侧提示行 + 悬浮说明：批次与岗位以官网最新公告为准、招满即止、谨防收费内推与保面骗局；选中公司后题列表头部显示「{公司} · 官方网申」。
 - **边界**：面经页 / Dashboard 暂不重复展示（避免同字段多处维护）；入口链接会随厂商调整失效，更新走种子脚本而非手改数据库。
+
+## 2026-08-30 续二十（题库工程能力维度：Python/Java/后端工程/项目深挖）
+
+- **背景**：用户回看题库发现面经里真实出现的 Python/Java/后端基础与项目追问类问题（"遇到什么问题/模块为什么这样设计"）没有专门分类。口径红线（用户明确要求）：**贴合大模型应用场景，不是什么 Python/Java 题都要**。
+- **词表扩展**：`tag_vocab.CANONICAL_TAGS` 与 `qa_extract.TAG_FAMILIES` 同步新增 4 个 canonical 标签（Python、Java、后端工程、项目深挖）+ 显式别名；抽取 prompt 写入场景口径：只标"大模型应用/Agent 开发岗真实会问的工程基础"（GIL/asyncio/流式生成器/并发服务化/缓存消息队列/网络 OS 常识），泛后端八股（Spring/JVM/SSM/泛型）不标。
+- **存量回填**：`scripts/backfill_engineering_tags.py` 两阶段（SQL 关键词粗筛 774 候选 → LLM 按场景口径精判，项目追问类只召回 behavior/scenario kind）。只增不删、meta.eng_backfill_at 检查点幂等续跑、track 为空/未分类且命中工程标签时归入通用基础。结果：后端工程 290、项目深挖 107（含导入后增量 Python 112 / Java 48），Java 抽查全部是 LLM 集成/SSE/Agent 编排类场景题，泛 JVM 八股零误标。
+- **补题**：新增 `interview-python` 源（taizilongxu/interview_python，17k star，无 license → STEMS_ONLY 仅取题干），导入 +133 题。
+- **合规否决记录**：guoguo-tju/agent_java_offer（Java 后端+AI）为 CC BY-NC 4.0 → 按 sources.py 门禁 REFERENCE_ONLY 禁入；Snailclimb/JavaGuide（Apache-2.0 合规）主体为泛 Java 后端八股，**因不贴合大模型应用场景主动否决**；resumejob/interview-questions 内容已整体迁往商业站 osjobs.net，GitHub 仅剩链接目录，不作源。
+- **前端**：题库页标签 chips 由"top 18"改为"计数 ≥20 全展示"，四个新分类直接露出（低频杂项仍截掉）。

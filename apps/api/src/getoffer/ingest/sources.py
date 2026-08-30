@@ -112,6 +112,14 @@ def _build_sources() -> dict[str, SourceSpec]:
         allowed_use=AllowedUse.STEMS_ONLY,
         notes="真实面经，按公司目录；仅提取题干",
     ),
+    SourceSpec(
+        slug="interview-python",
+        name="interview_python（Python 面试题）",
+        repo_url="https://github.com/taizilongxu/interview_python",
+        license="NONE",
+        allowed_use=AllowedUse.STEMS_ONLY,
+        notes="17k star Python 语言基础问答；仅提取题干。语言维度补缺（spec 续二十），答案自写",
+    ),
     # --- GPL / NC：禁止入库 ---
     SourceSpec(
         slug="aigc-interview-book",

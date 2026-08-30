@@ -241,12 +241,11 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
     return start + index;
   }).filter((value) => value >= 1 && value <= totalPages);
 
-  // 标签 chips 由真实计数驱动（归一后的 canonical 名），只展示有题的
+  // 标签 chips 由真实计数驱动（归一后的 canonical 名）；只截掉尾部低频杂项（spec 续二十）
   const tagEntries = stats
     ? Object.entries(stats.by_tag)
-        .filter(([, count]) => count > 0)
+        .filter(([, count]) => count >= 20)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 18)
     : [];
 
   const showEmpty = list.loaded && !list.error && list.items.length === 0;
