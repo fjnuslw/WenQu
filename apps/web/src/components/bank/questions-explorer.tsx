@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, Code2, Inbox, Link as LinkIcon, MessageCircleQuestion, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Code2, ExternalLink, Inbox, Info, Link as LinkIcon, MessageCircleQuestion, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -18,6 +18,8 @@ interface CompanyItem {
   name: string;
   logo: string | null;
   question_count: number;
+  career_url: string | null;
+  career_note: string | null;
 }
 
 interface SourceInfo {
@@ -248,6 +250,8 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
     : [];
 
   const showEmpty = list.loaded && !list.error && list.items.length === 0;
+  // 当前选中公司的官方网申入口（题库页直达投递，spec 续十九）
+  const activeCareer = company ? companies.find((item) => item.name === company) : undefined;
 
   return (
     <div className="space-y-4">
@@ -267,10 +271,19 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
         </div>
       </Card>
 
-      {/* 公司 logo 横条（加大瓷片） */}
+      {/* 公司 logo 横条（加大瓷片；带官方网申直达，见 spec 续十九） */}
       <Card className="p-3">
-        <FacetLabel text="按厂商" />
-        <div className="flex gap-3 overflow-x-auto pb-1">
+        <div className="flex items-center justify-between">
+          <FacetLabel text="按厂商" />
+          <span
+            className="flex items-center gap-1 text-[11px] text-ink-faint"
+            title="「网申 ↗」直达公司官方校招入口（2026-08 逐家核验存活）。秋招多为招满即止，批次与岗位以官网最新公告为准；谨防收费内推与保面骗局。"
+          >
+            <Info className="size-3" />
+            网申 = 官方校招入口 · 27 届秋招进行中
+          </span>
+        </div>
+        <div className="mt-1 flex gap-3 overflow-x-auto pb-1">
           <button
             onClick={() => setCompany("")}
             className={cn(
@@ -284,21 +297,37 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
             <span className="text-xs text-ink-dim">不限厂商</span>
           </button>
           {companies
-            .filter((item) => item.question_count > 0 || item.logo)
+            .filter((item) => item.question_count > 0 || item.logo || item.career_url)
             .map((item) => (
-              <button
+              <div
                 key={item.id}
-                onClick={() => setCompany((current) => (current === item.name ? "" : item.name))}
-                title={`${item.name} · ${item.question_count} 题`}
                 className={cn(
-                  "flex w-[104px] shrink-0 flex-col items-center gap-2 rounded-xl border px-2.5 py-3 transition-colors",
+                  "flex w-[104px] shrink-0 flex-col items-center gap-1.5 rounded-xl border px-2.5 py-3 transition-colors",
                   company === item.name ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong",
                 )}
               >
-                <CompanyLogo name={item.name} logo={item.logo} />
-                <span className="w-full truncate text-center text-xs text-ink-dim">{item.name}</span>
-                <span className="text-[11px] text-ink-faint">{item.question_count} 题</span>
-              </button>
+                {/* 按钮与网申链接平级（button 内不能嵌套 a） */}
+                <button
+                  onClick={() => setCompany((current) => (current === item.name ? "" : item.name))}
+                  title={`${item.name} · ${item.question_count} 题`}
+                  className="flex flex-col items-center gap-2"
+                >
+                  <CompanyLogo name={item.name} logo={item.logo} />
+                  <span className="w-full truncate text-center text-xs text-ink-dim">{item.name}</span>
+                  <span className="text-[11px] text-ink-faint">{item.question_count} 题</span>
+                </button>
+                {item.career_url && (
+                  <a
+                    href={item.career_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={item.career_note ?? `${item.name} 官方校招网申入口`}
+                    className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
+                  >
+                    <ExternalLink className="size-3" /> 网申
+                  </a>
+                )}
+              </div>
             ))}
         </div>
       </Card>
@@ -384,7 +413,20 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
       {list.items.length > 0 && (
         <>
           <div className="flex items-center justify-between text-xs text-ink-dim">
-            <span>共 {total} 题</span>
+            <span className="flex items-center gap-3">
+              共 {total} 题
+              {activeCareer?.career_url && (
+                <a
+                  href={activeCareer.career_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={activeCareer.career_note ?? `${activeCareer.name} 官方校招网申入口`}
+                  className="inline-flex items-center gap-1 text-accent hover:underline"
+                >
+                  <ExternalLink className="size-3" /> {activeCareer.name} · 官方网申
+                </a>
+              )}
+            </span>
             <span className="flex items-center gap-2">
               每页
               {PAGE_SIZES.map((size) => (

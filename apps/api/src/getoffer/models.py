@@ -62,6 +62,9 @@ class Company(Base, IntPkMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     aliases: Mapped[list[Any]] = mapped_column(JSON, default=list, nullable=False)
     logo: Mapped[str | None] = mapped_column(String(255), nullable=True)  # web 静态资源路径
+    # 官方校招/网申入口（题库页公司瓷片直达投递）；只存官方域名，人工核验后由种子脚本写入
+    career_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    career_note: Mapped[str | None] = mapped_column(String(255), nullable=True)  # 补充通道/筛选建议
 
 
 class Tag(Base, IntPkMixin):

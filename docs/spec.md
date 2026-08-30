@@ -336,3 +336,11 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **人工摘录闭环**：新增 `POST /api/ingest/collect/manual`，支持小红书/知乎/脉脉/朋友分享四种来源；只消费用户提交的文本、可选溯源 URL 和日期，绝不请求原站。自动采集与人工文本共用 `ingest_post_previews`，因此共享 LLM 忠实抽取、公司词表匹配、content_hash 幂等和问题树入库；人工确认日期优先于模型推断。`/experiences` 新增“人工摘录”弹层，导入后刷新来源 tab。
 - **数据与验收**：本轮后共 20 条面经：牛客 16（公司匹配 10、主问题 164、追问 10），CSDN 3（匹配 2、主问题 90），小红书人工摘录 1（匹配 1、主问题 3、追问 1）。真实端点首次/重跑分别验证新增与 `inserted=0`；资料广告样例返回 `skipped_non_experience=1`。后端 11 项 pytest、ruff、py_compile、前端 TypeScript 与 Next production build 全部通过；浏览器验证人工来源 tab、日期与追问树正常。
 - **用户授权后的浏览器辅助扩充**：用户明确授权后，通过已登录的可见浏览器低频逐帖检索与翻图识别，没有新增小红书自动采集器、隐藏接口调用、Cookie 提取或无人值守翻页。人工审核并导入京东、字节、腾讯、百度、面壁智能、淘天、小红书、地平线 8 篇真实面经，首次全部 `inserted=1`，原样重跑全部 `duplicates=1, inserted=0`。当前共 28 条面经，其中 `manual-xhs` 9 条、153 个主问题和 1 个追问；`/experiences` 实测来源 tab 为 `小红书人工摘录 9`，筛选结果 `9/28`。图片密集长帖仍受单篇 30 题 schema 上限约束，面壁智能 9 图中的后续问题已在交接总结列为遗留，未伪造或静默拆成多场面试。
+
+## 2026-08-30 续十九（27 届秋招官方网申入口进题库）
+
+- **背景**：27 届秋招集中开启期，用户逐家核验了 24 家大模型相关公司的官方校招 / Early Career 网申入口（覆盖字节、阿里、腾讯、DeepSeek、智谱、月之暗面、MiniMax 等）。决定放进题库页：复习「公司 × 频率」时可直接进入投递。
+- **数据**：`companies` 新增 `career_url` / `career_note` 两列（`scripts/migrate_002_career_url.py`，IF NOT EXISTS 可重复执行）；`scripts/seed_career_urls.py` 以名称→别名顺序匹配既有 25 家公司幂等写入（微博合并「新浪/sina」别名），重跑 `更新 0, 一致 24`。只存官方域名入口，剥离第三方 UTM 追踪参数；2026-08-30 对 24 条 URL 全量存活探测（反爬拦截视同存活）。备注列只记结构性事实（网易游戏另走 campus.game.163.com、Google/微软/亚马逊岗位滚动上线需筛 China 等）。
+- **API**：`GET /api/companies` 每项新增 `career_url` / `career_note`。
+- **UI（题库页）**：公司瓷片下方新增「网申 ↗」直达（按钮与链接平级，避免 button 嵌套 a 的无效 HTML）；0 题但带网申入口的公司也展示（DeepSeek/MiniMax 等暂无题可先投递）；「按厂商」栏右侧提示行 + 悬浮说明：批次与岗位以官网最新公告为准、招满即止、谨防收费内推与保面骗局；选中公司后题列表头部显示「{公司} · 官方网申」。
+- **边界**：面经页 / Dashboard 暂不重复展示（避免同字段多处维护）；入口链接会随厂商调整失效，更新走种子脚本而非手改数据库。

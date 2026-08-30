@@ -26,6 +26,8 @@ async def list_companies(session: AsyncSession = Depends(get_db_session)) -> dic
             "name": company.name,
             "logo": company.logo,
             "question_count": counts.get(company.id, 0),
+            "career_url": company.career_url,
+            "career_note": company.career_note,
         }
         for company in rows
     ]
