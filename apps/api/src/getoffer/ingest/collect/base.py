@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import date
 from typing import Protocol
 
 
@@ -23,10 +24,12 @@ class PostPreview:
     抽取只忠于该文本，截断部分不编造（experience_extract 规则 1）。
     """
 
-    url: str
+    url: str | None
     title: str
     meta: str  # 日期/作者行等页面元信息（可能为空）
     content: str
+    # 人工确认的面试日期优先于 LLM 推断；自动渠道默认为 None。
+    occurred_on: date | None = None
 
     def as_text(self) -> str:
         return "\n".join(part for part in (self.title, self.meta, self.content) if part)

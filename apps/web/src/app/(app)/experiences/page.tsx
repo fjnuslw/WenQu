@@ -1,13 +1,14 @@
 "use client";
 
-import { ExternalLink, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ExternalLink, Loader2, Plus, RefreshCw, X } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { CompanyLogo } from "@/components/company-logo";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,17 @@ interface ExperienceList {
   total: number;
   items: ExperienceOut[];
 }
+
+interface CollectReport {
+  channel: string;
+  posts_seen: number;
+  duplicates: number;
+  skipped_non_experience: number;
+  inserted: number;
+  unmatched_companies: string[];
+}
+
+const MANUAL_SOURCES = ["小红书人工摘录", "知乎人工摘录", "脉脉人工摘录", "朋友分享"];
 
 const COLLAPSED_QUESTIONS = 3;
 
@@ -157,12 +169,183 @@ function CompanyChips({
   );
 }
 
+function ManualImportDialog({
+  open,
+  onClose,
+  onImported,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onImported: () => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceName, setSourceName] = useState(MANUAL_SOURCES[0]);
+  const [occurredOn, setOccurredOn] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<CollectReport | null>(null);
+
+  const resetAndClose = useCallback(() => {
+    if (submitting) return;
+    setText("");
+    setSourceUrl("");
+    setSourceName(MANUAL_SOURCES[0]);
+    setOccurredOn("");
+    setError(null);
+    setResult(null);
+    onClose();
+  }, [onClose, submitting]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") resetAndClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, resetAndClose]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    setResult(null);
+    try {
+      const body: Record<string, string> = { text: text.trim(), source_name: sourceName };
+      if (sourceUrl.trim()) body.source_url = sourceUrl.trim();
+      if (occurredOn) body.occurred_on = occurredOn;
+      const report = await apiFetch<CollectReport>("/api/ingest/collect/manual", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setResult(report);
+      await onImported();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) resetAndClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manual-import-title"
+        className="w-full max-w-2xl rounded-xl border border-line bg-surface shadow-2xl"
+      >
+        <div className="flex items-start justify-between border-b border-line px-5 py-4">
+          <div>
+            <h2 id="manual-import-title" className="text-base font-semibold text-ink">
+              人工摘录面经
+            </h2>
+            <p className="mt-1 text-xs text-ink-dim">
+              请先在原平台人工浏览并复制文本。系统只处理你粘贴的内容，不会访问原帖链接。
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="关闭"
+            className="rounded-md p-1 text-ink-faint hover:bg-surface-2 hover:text-ink"
+            onClick={resetAndClose}
+            disabled={submitting}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <form className="space-y-4 p-5" onSubmit={handleSubmit}>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">面经文本</span>
+            <textarea
+              className="min-h-56 w-full resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="粘贴公司、岗位、轮次和具体面试问题。广告、资料分享或没有问题内容的文本不会入库。"
+              minLength={20}
+              maxLength={20000}
+              required
+            />
+            <span className="mt-1 block text-right text-xs text-ink-faint">{text.length}/20000</span>
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink">来源渠道</span>
+              <select
+                className="h-9 w-full rounded-md border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
+                value={sourceName}
+                onChange={(event) => setSourceName(event.target.value)}
+              >
+                {MANUAL_SOURCES.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink">面试日期（可选）</span>
+              <Input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">原帖链接（可选，仅用于溯源）</span>
+            <Input
+              type="url"
+              value={sourceUrl}
+              onChange={(event) => setSourceUrl(event.target.value)}
+              placeholder="https://..."
+              maxLength={2000}
+            />
+          </label>
+
+          {error && <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">导入失败：{error}</p>}
+          {result && (
+            <div className="rounded-md border border-line bg-surface-2 px-3 py-2 text-sm text-ink-dim">
+              {result.inserted > 0
+                ? `已新增 ${result.inserted} 条面经。`
+                : result.duplicates > 0
+                  ? "这段摘录已经导入过，没有重复写入。"
+                  : "文本未识别为包含具体问题的真实面经，没有入库。"}
+              {result.unmatched_companies.length > 0 && (
+                <span className="ml-1">公司词表未匹配：{result.unmatched_companies.join("、")}。</span>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 border-t border-line pt-4">
+            <Button type="button" variant="secondary" onClick={resetAndClose} disabled={submitting}>
+              关闭
+            </Button>
+            <Button type="submit" disabled={submitting || text.trim().length < 20}>
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {submitting ? "抽取并导入中" : "抽取并导入"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ExperiencesPage() {
   const [data, setData] = useState<ExperienceList | null>(null);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceSlug, setSourceSlug] = useState<string | null>(null);
   const [company, setCompany] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const load = useCallback(async () => {
     setFetching(true);
@@ -221,7 +404,7 @@ export default function ExperiencesPage() {
     <div className="mx-auto max-w-5xl p-8">
       <PageHeader
         title="面经"
-        description="结构化面经流（公司-岗位-轮次-问题树），由公开渠道采集 + LLM 结构化抽取，点击原帖可溯源。"
+        description="结构化面经流（公司-岗位-轮次-问题树），来自合规公开采集与人工摘录，点击原帖可溯源。"
       />
 
       <div className="mb-5 space-y-3">
@@ -229,10 +412,16 @@ export default function ExperiencesPage() {
           <p className="text-sm text-ink-dim">
             {data ? `${filtered.length}/${data.total} 条面经` : "加载中…"}
           </p>
-          <Button variant="secondary" size="sm" onClick={() => void load()} disabled={fetching}>
-            <RefreshCw className={fetching ? "size-4 animate-spin" : "size-4"} />
-            刷新
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setManualOpen(true)}>
+              <Plus className="size-4" />
+              人工摘录
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => void load()} disabled={fetching}>
+              <RefreshCw className={fetching ? "size-4 animate-spin" : "size-4"} />
+              刷新
+            </Button>
+          </div>
         </div>
         {data && data.items.length > 0 && (
           <>
@@ -301,6 +490,12 @@ export default function ExperiencesPage() {
           </Card>
         ))}
       </div>
+
+      <ManualImportDialog
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        onImported={load}
+      />
     </div>
   );
 }

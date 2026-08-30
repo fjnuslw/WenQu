@@ -23,8 +23,8 @@ from getoffer.llm.gateway import LLMGateway
 from getoffer.models import Company, Experience, ExperienceItem, Source
 
 
-def experience_content_hash(url: str, content: str) -> str:
-    normalized = " ".join(unicodedata.normalize("NFKC", f"{url}\n{content}").split()).lower()
+def experience_content_hash(url: str | None, content: str) -> str:
+    normalized = " ".join(unicodedata.normalize("NFKC", f"{url or ''}\n{content}").split()).lower()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
@@ -70,24 +70,17 @@ async def _get_or_create_channel_source(session: AsyncSession, spec: ChannelSpec
     return row
 
 
-async def collect_channel(
-    slug: str,
+async def ingest_post_previews(
+    spec: ChannelSpec,
+    posts: list[PostPreview],
     *,
     session: AsyncSession,
     gateway: LLMGateway,
-    settings: Settings,
-    max_posts: int,
 ) -> CollectReport:
-    spec = get_channel(slug)
-    report = CollectReport(channel=slug)
+    """把已取得的公开预览或人工文本走同一条抽取、去重与入库路径。"""
+    report = CollectReport(channel=spec.slug)
     source_row = await _get_or_create_channel_source(session, spec)
     matcher = CompanyMatcher(list((await session.scalars(select(Company))).all()))
-
-    client = PoliteClient(proxy=settings.collect_proxy, min_interval=spec.min_interval)
-    try:
-        posts: list[PostPreview] = await spec.fetch_posts(client, max_posts)
-    finally:
-        await client.aclose()
 
     for post in posts:
         report.posts_seen += 1
@@ -106,12 +99,13 @@ async def collect_channel(
         if draft.company and company is None and draft.company not in report.unmatched_companies:
             report.unmatched_companies.append(draft.company)
 
+        extracted_date = date.fromisoformat(draft.occurred_on) if draft.occurred_on else None
         experience = Experience(
             source_id=source_row.id,
             company_id=company.id if company is not None else None,
             role=draft.role,
             round=draft.rounds,
-            occurred_on=date.fromisoformat(draft.occurred_on) if draft.occurred_on else None,
+            occurred_on=post.occurred_on or extracted_date,
             result=draft.result,
             url=post.url,
             raw_text=post.as_text(),
@@ -142,3 +136,20 @@ async def collect_channel(
 
     await session.commit()
     return report
+
+
+async def collect_channel(
+    slug: str,
+    *,
+    session: AsyncSession,
+    gateway: LLMGateway,
+    settings: Settings,
+    max_posts: int,
+) -> CollectReport:
+    spec = get_channel(slug)
+    client = PoliteClient(proxy=settings.collect_proxy, min_interval=spec.min_interval)
+    try:
+        posts: list[PostPreview] = await spec.fetch_posts(client, max_posts)
+    finally:
+        await client.aclose()
+    return await ingest_post_previews(spec, posts, session=session, gateway=gateway)

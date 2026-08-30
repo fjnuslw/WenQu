@@ -3,8 +3,11 @@
 导入在 P0 阶段内联执行（dev 友好）；进入 K1 的批量采集时切换为 arq 队列任务，
 端点语义不变（提交即返回任务号）。"""
 
+from datetime import date
+from urllib.parse import urlsplit
+
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -25,6 +28,43 @@ class SourceOut(BaseModel):
     allowed_use: str
     repo_url: str
     notes: str
+
+
+class ManualCollectIn(BaseModel):
+    text: str = Field(min_length=20, max_length=20_000)
+    source_url: str | None = Field(default=None, max_length=2_000)
+    source_name: str = Field(default="小红书人工摘录", min_length=1, max_length=32)
+    occurred_on: date | None = None
+
+    @field_validator("text", "source_name")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("不得只包含空白")
+        return cleaned
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        cleaned = value.strip()
+        parts = urlsplit(cleaned)
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            raise ValueError("source_url 必须是 http/https 原帖链接")
+        return cleaned
+
+
+def _collect_report_out(report) -> dict:
+    return {
+        "channel": report.channel,
+        "posts_seen": report.posts_seen,
+        "duplicates": report.duplicates,
+        "skipped_non_experience": report.skipped_non_experience,
+        "inserted": report.inserted,
+        "unmatched_companies": report.unmatched_companies,
+    }
 
 
 @router.get("/sources", response_model=list[SourceOut])
@@ -73,6 +113,26 @@ async def run_import(
     }
 
 
+@router.post("/collect/manual")
+async def collect_manual(
+    body: ManualCollectIn,
+    session: AsyncSession = Depends(get_db_session),
+    gateway=Depends(get_gateway),
+) -> dict:
+    """人工摘录入库；只处理请求体，不对 source_url 发起任何网络请求。"""
+    from getoffer.ingest.collect.manual import make_manual_post
+    from getoffer.ingest.collect.runner import ingest_post_previews
+
+    spec, post = make_manual_post(
+        text=body.text,
+        source_url=body.source_url,
+        source_name=body.source_name,
+        occurred_on=body.occurred_on,
+    )
+    report = await ingest_post_previews(spec, [post], session=session, gateway=gateway)
+    return _collect_report_out(report)
+
+
 @router.post("/collect/{slug}")
 async def collect_channel(
     slug: str,
@@ -81,7 +141,7 @@ async def collect_channel(
     gateway=Depends(get_gateway),
     settings=Depends(get_settings),
 ) -> dict:
-    """渠道面经采集（F1 后半：牛客/linux.do → LLM 结构化 → experiences 幂等入库）。
+    """自动渠道面经采集（牛客/CSDN/linux.do → LLM 结构化 → experiences 幂等入库）。
 
     内联执行（与导入一致，换 arq 队列时端点语义不变）；低频限速在 PoliteClient 内强制，
     max_posts 越大耗时越长（每帖一次 LLM 抽取 + 渠道请求间隔）。
@@ -90,14 +150,7 @@ async def collect_channel(
 
     bounded = max(1, min(max_posts, 30))
     report = await run_collect(slug, session=session, gateway=gateway, settings=settings, max_posts=bounded)
-    return {
-        "channel": report.channel,
-        "posts_seen": report.posts_seen,
-        "duplicates": report.duplicates,
-        "skipped_non_experience": report.skipped_non_experience,
-        "inserted": report.inserted,
-        "unmatched_companies": report.unmatched_companies,
-    }
+    return _collect_report_out(report)
 
 
 @router.post("/reindex")
