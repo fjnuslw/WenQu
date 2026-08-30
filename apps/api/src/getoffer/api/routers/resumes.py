@@ -1,4 +1,4 @@
-"""简历工作台 API（F5 · I1 简历押题的数据源）：上传解析 → 结构化画像 → claims 入库。
+"""简历工作台 API（F5 · I1 简历押题的数据源）：上传解析 → 结构化画像 → claims 入库 + JD 匹配度。
 
 解析流水线（可审计，spec §7）：
 1. PDF 文本提取（pypdf，无正则）；
@@ -6,6 +6,7 @@
 3. 持久化 resumes.parsed + resume_claims（项目要点即"声明"，供 G1 项目拷打做声明-证据映射）。
 """
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -148,6 +149,57 @@ async def get_resume(
     if row is None:
         raise NotFound(f"简历不存在: {resume_id}")
     return {"id": row.id, "file_name": Path(row.file_path).name, "profile": row.parsed or {}}
+
+
+class JdMatchRequest(BaseModel):
+    jd_text: str = Field(min_length=20, max_length=8000)
+
+
+class JdMatchResult(BaseModel):
+    match_score: int = Field(ge=0, le=100, description="匹配度 0-100")
+    matched: list[str] = Field(max_length=12, description="已覆盖的要求")
+    gaps: list[str] = Field(max_length=10, description="缺口：JD 要求但简历未见")
+    advantages: list[str] = Field(max_length=6, description="超出 JD 的加分项")
+    suggestions: list[str] = Field(max_length=6, description="改简历/补技能的可执行建议")
+
+
+JD_MATCH_SYSTEM = """你是资深技术招聘官。输入：候选人简历画像（结构化 JSON）+ 目标岗位 JD 原文。
+任务：评估匹配度。
+- match_score：0-100（60=基本够格，80=强匹配）
+- matched：JD 核心要求中简历已有对应证据的（引用简历里的技术/项目要点）
+- gaps：JD 要求但简历没有的（具体到技能/经历，按重要度排序）
+- advantages：简历有而 JD 未要求、但对该岗位加分的
+- suggestions：可执行建议（简历措辞怎么改、快速补哪个技能/项目）
+规则：只依据给定材料判断，不假设简历未提及的经历；gaps 宁全勿漏，matched 必须有据。"""
+
+
+@router.post("/{resume_id}/jd-match")
+async def jd_match(
+    resume_id: int,
+    request: JdMatchRequest,
+    session: AsyncSession = Depends(get_db_session),
+    gateway: LLMGateway = Depends(get_gateway),
+) -> dict[str, Any]:
+    row = await session.get(Resume, resume_id)
+    if row is None:
+        raise NotFound(f"简历不存在: {resume_id}")
+    if not row.parsed:
+        raise ValidationFailed(f"简历 {resume_id} 缺少解析画像，请重新上传")
+    result = await gateway.complete_structured(
+        [
+            {
+                "role": "user",
+                "content": (
+                    f"## 简历画像\n{json.dumps(row.parsed, ensure_ascii=False)}"
+                    f"\n\n## 目标 JD\n{request.jd_text}"
+                ),
+            }
+        ],
+        JdMatchResult,
+        system=JD_MATCH_SYSTEM,
+        purpose="resume.jd_match",
+    )
+    return result.model_dump()
 
 
 @router.delete("/{resume_id}")

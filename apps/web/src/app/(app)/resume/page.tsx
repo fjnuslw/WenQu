@@ -19,6 +19,14 @@ interface ResumeListItem {
   highlights: string[];
 }
 
+interface JdMatchResult {
+  match_score: number;
+  matched: string[];
+  gaps: string[];
+  advantages: string[];
+  suggestions: string[];
+}
+
 interface ResumeProfile {
   candidate_name?: string | null;
   role_target?: string | null;
@@ -35,6 +43,9 @@ export default function ResumePage() {
   const [uploading, setUploading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [jdText, setJdText] = useState("");
+  const [jdMatch, setJdMatch] = useState<JdMatchResult | null>(null);
+  const [jdBusy, setJdBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadList = useCallback(async () => {
@@ -89,6 +100,26 @@ export default function ResumePage() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function runJdMatch() {
+    if (selectedId === null || jdText.trim().length < 20) {
+      setError("先选择简历，并粘贴至少 20 字的 JD 原文");
+      return;
+    }
+    setJdBusy(true);
+    setError(null);
+    try {
+      const data = await apiFetch<JdMatchResult>(`/api/resumes/${selectedId}/jd-match`, {
+        method: "POST",
+        body: JSON.stringify({ jd_text: jdText.trim() }),
+      });
+      setJdMatch(data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setJdBusy(false);
     }
   }
 
@@ -164,6 +195,61 @@ export default function ResumePage() {
       )}
 
       {loadingProfile && <p className="text-sm text-ink-dim">加载画像…</p>}
+
+      <Card className="mb-5">
+        <CardContent className="space-y-3 p-5">
+          <h3 className="text-sm font-semibold text-ink">JD 匹配度</h3>
+          <textarea
+            className="min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            placeholder="粘贴目标岗位 JD 原文（岗位职责与任职要求）…"
+            value={jdText}
+            onChange={(event) => setJdText(event.target.value)}
+          />
+          <div className="flex items-center gap-3">
+            <Button size="sm" onClick={() => void runJdMatch()} disabled={jdBusy || !profile}>
+              {jdBusy ? "分析中…" : "评估匹配度"}
+            </Button>
+            <span className="text-xs text-ink-faint">需要先上传并解析简历</span>
+          </div>
+          {jdMatch && (
+            <div className="space-y-3 rounded-lg bg-surface-2 p-4">
+              <div className="flex items-baseline gap-3">
+                <span className="text-2xl font-semibold text-accent">{jdMatch.match_score}</span>
+                <span className="text-xs text-ink-dim">/100 匹配度</span>
+              </div>
+              {(
+                [
+                  { label: "已覆盖", items: jdMatch.matched, color: "text-ok" },
+                  { label: "缺口", items: jdMatch.gaps, color: "text-warn" },
+                  { label: "加分项", items: jdMatch.advantages, color: "text-accent" },
+                ] as const
+              ).map(
+                (group) =>
+                  group.items.length > 0 && (
+                    <div key={group.label}>
+                      <div className={`mb-1 text-xs font-medium ${group.color}`}>{group.label}</div>
+                      <ul className="list-disc space-y-0.5 pl-5 text-xs leading-relaxed text-ink-dim">
+                        {group.items.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ),
+              )}
+              {jdMatch.suggestions.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-ink">建议</div>
+                  <ul className="list-disc space-y-0.5 pl-5 text-xs leading-relaxed text-ink-dim">
+                    {jdMatch.suggestions.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {profile && (
         <div className="space-y-4">

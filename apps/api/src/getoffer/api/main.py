@@ -75,6 +75,7 @@ def create_app() -> FastAPI:
         resumes,
         review,
         sessions,
+        stats,
     )
 
     app.include_router(ingest.router)
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(resumes.router)
     app.include_router(review.router)
     app.include_router(grill.router)
+    app.include_router(stats.router)
 
     @app.get("/api/health")
     async def health() -> dict:

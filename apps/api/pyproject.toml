@@ -19,6 +19,7 @@ dependencies = [
     "meilisearch>=0.33",
     "arq>=0.26",
     "python-multipart>=0.0.20",
+    "genanki>=0.13",
 ]
 
 [project.optional-dependencies]

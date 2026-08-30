@@ -44,6 +44,7 @@ class WeaknessItem(BaseModel):
     """失分点带证据：回流 SM-2 时保留代码锚点，复习时能回看现场。"""
 
     text: str = Field(description="失分点/盲区，具体到知识点")
+    tags: list[str] = Field(default_factory=list, max_length=3, description="涉及的知识标签（从指定词表选）")
     evidence: list[EvidenceRef] = Field(default_factory=list, max_length=3)
 
 
@@ -67,7 +68,13 @@ REPORT_SYSTEM = """你是大模型应用/Agent 岗位的资深面试评价官。
 - 失分点（weaknesses）同样带 evidence：quote=暴露问题的原话；code=相关的代码位置（如有）。
 - 禁止臆造未出现的内容：evidence 必须能在记录中逐字找到。
 
-同时输出：亮点、失分点（供复习回流）、复习建议（注明涉及的知识标签，如 RAG/Agent/推理部署）。"""
+同时输出：亮点、失分点（供复习回流，每条从词表选 0-3 个 tags：{TAG_FAMILIES}）、复习建议（注明涉及的知识标签）。"""
+
+
+def _report_system() -> str:
+    from getoffer.ingest.qa_extract import TAG_FAMILIES
+
+    return REPORT_SYSTEM.replace("{TAG_FAMILIES}", "、".join(TAG_FAMILIES))
 
 
 def _load_transcript(log_path: Path) -> dict[str, Any]:
@@ -148,6 +155,7 @@ async def _ingest_weaknesses(session: AsyncSession, *, session_id: str, report: 
                 content_hash=digest,
                 question_text=text[:120],
                 weakness=text,
+                tag=next((t for t in weakness.tags if t.strip()), None),  # 掌握度统计维度
             )
         )
         added += 1
@@ -169,7 +177,7 @@ async def generate_report(
             "content": f"面试配置：{json.dumps(loaded['config'], ensure_ascii=False)}\n\n面试记录：\n{loaded['transcript']}",
         }],
         InterviewReport,
-        system=REPORT_SYSTEM,
+        system=_report_system(),
         purpose="interview.report",
         max_tokens=8192,
     )

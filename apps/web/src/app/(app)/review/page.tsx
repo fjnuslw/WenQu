@@ -24,6 +24,14 @@ interface ReviewItemOut {
   overdue: boolean;
 }
 
+interface MasteryOut {
+  total: number;
+  mastered: number;
+  learning: number;
+  due: number;
+  by_tag: Record<string, { total: number; mastered: number; learning: number; due: number }>;
+}
+
 const GRADE_BUTTONS = [
   { grade: "forgot", label: "忘了", variant: "danger" as const, hint: "重学，明天再见" },
   { grade: "fuzzy", label: "模糊", variant: "secondary" as const, hint: "缩短间隔" },
@@ -32,6 +40,7 @@ const GRADE_BUTTONS = [
 
 export default function ReviewPage() {
   const [items, setItems] = useState<ReviewItemOut[] | null>(null);
+  const [mastery, setMastery] = useState<MasteryOut | null>(null);
   const [total, setTotal] = useState(0);
   const [scope, setScope] = useState<"due" | "all">("due");
   const [fetching, setFetching] = useState(false);
@@ -42,11 +51,13 @@ export default function ReviewPage() {
     setFetching(true);
     setError(null);
     try {
-      const data = await apiFetch<{ total: number; items: ReviewItemOut[] }>(
-        `/api/review?scope=${scope}&limit=100`,
-      );
+      const [data, masteryData] = await Promise.all([
+        apiFetch<{ total: number; items: ReviewItemOut[] }>(`/api/review?scope=${scope}&limit=100`),
+        apiFetch<MasteryOut>("/api/review/mastery"),
+      ]);
       setItems(data.items);
       setTotal(data.total);
+      setMastery(masteryData);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -85,6 +96,41 @@ export default function ReviewPage() {
         title="复习队列"
         description="评分报告的失分点自动回流到这里，SM-2 间隔重复安排复习节奏——掌握了才拉长间隔。"
       />
+
+      {mastery && mastery.total > 0 && (
+        <Card className="mb-5">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-sm font-semibold text-ink">掌握度</span>
+              <span className="text-xs text-ink-dim">
+                已掌握 {mastery.mastered} · 学习中 {mastery.learning} · 今日待复习 {mastery.due}
+              </span>
+              <a
+                className="ml-auto text-xs text-accent hover:underline"
+                href="/api/review/export.anki"
+                download
+              >
+                导出 Anki 牌组（.apkg）
+              </a>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="h-full rounded-full bg-ok/80"
+                style={{ width: `${Math.round((mastery.mastered / mastery.total) * 100)}%` }}
+              />
+            </div>
+            {Object.keys(mastery.by_tag).length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+                {Object.entries(mastery.by_tag).map(([tag, stat]) => (
+                  <span key={tag} className="text-xs text-ink-dim">
+                    <span className="font-medium text-ink">{tag}</span> {stat.mastered}/{stat.total}
+                  </span>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
