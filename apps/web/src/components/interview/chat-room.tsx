@@ -28,17 +28,30 @@ interface QuestionProgress {
   stem: string;
 }
 
+interface EvidenceRef {
+  kind: "quote" | "code";
+  quote: string;
+  file: string | null;
+  line: number | null;
+}
+
 interface ReportScore {
   dimension: string;
   score: number;
   comment: string;
+  evidence: EvidenceRef[];
+}
+
+interface WeaknessItem {
+  text: string;
+  evidence: EvidenceRef[];
 }
 
 interface InterviewReport {
   summary: string;
   scores: ReportScore[];
   strengths: string[];
-  weaknesses: string[];
+  weaknesses: WeaknessItem[];
   review_suggestions: string[];
 }
 
@@ -174,12 +187,54 @@ function ThinkingPanel({
   );
 }
 
-function ReportPanel({ report }: { report: InterviewReport }) {
+/** 证据链渲染：原话=引用块；代码位置=可点击（grill 会话跳侧栏定位）。 */
+function EvidenceList({
+  evidence,
+  onOpenFileRef,
+}: {
+  evidence: EvidenceRef[];
+  onOpenFileRef?: (path: string, line: number) => void;
+}) {
+  if (!evidence || evidence.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1.5">
+      {evidence.map((ref, index) =>
+        ref.kind === "code" && ref.file ? (
+          <button
+            key={index}
+            type="button"
+            className="block w-full rounded-md border border-line bg-surface px-2.5 py-1 text-left font-mono text-xs text-accent hover:border-accent/40"
+            onClick={() => onOpenFileRef?.(ref.file as string, ref.line ?? 1)}
+            title={onOpenFileRef ? "点击在侧栏打开并定位" : undefined}
+          >
+            {ref.file}
+            {ref.line !== null && ref.line !== undefined ? `:${ref.line}` : ""}
+          </button>
+        ) : (
+          <blockquote
+            key={index}
+            className="border-l-2 border-line-strong pl-2.5 text-xs leading-relaxed text-ink-faint"
+          >
+            {ref.quote}
+          </blockquote>
+        ),
+      )}
+    </div>
+  );
+}
+
+function ReportPanel({
+  report,
+  onOpenFileRef,
+}: {
+  report: InterviewReport;
+  onOpenFileRef?: (path: string, line: number) => void;
+}) {
   return (
     <div className="mt-4 space-y-3 rounded-[10px] border border-accent/30 bg-accent-soft/40 p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-ink">评分报告</h3>
-        <Badge variant="accent">I1</Badge>
+        <Badge variant="accent">证据链</Badge>
       </div>
       <p className="text-sm leading-relaxed text-ink">{report.summary}</p>
       <div className="grid gap-2 md:grid-cols-2">
@@ -190,17 +245,21 @@ function ReportPanel({ report }: { report: InterviewReport }) {
               <span className="text-sm font-semibold text-accent">{score.score}/5</span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-ink-dim">{score.comment}</p>
+            <EvidenceList evidence={score.evidence ?? []} onOpenFileRef={onOpenFileRef} />
           </div>
         ))}
       </div>
       {report.weaknesses.length > 0 && (
         <div>
           <div className="mb-1 text-xs font-medium text-warn">失分点（回流复习队列）</div>
-          <ul className="list-disc space-y-1 pl-5 text-xs text-ink-dim">
+          <div className="space-y-2">
             {report.weaknesses.map((item, index) => (
-              <li key={index}>{item}</li>
+              <div key={index}>
+                <p className="text-xs leading-relaxed text-ink-dim">{item.text}</p>
+                <EvidenceList evidence={item.evidence ?? []} onOpenFileRef={onOpenFileRef} />
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
       {report.review_suggestions.length > 0 && (
@@ -478,7 +537,9 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
         </p>
       )}
 
-      {report && <ReportPanel report={report} />}
+      {report && (
+        <ReportPanel report={report} onOpenFileRef={isGrillMode && grillProjectId ? openFileRef : undefined} />
+      )}
 
       <div className="mt-4">
         <div className="flex gap-2">
