@@ -8,6 +8,7 @@ import {
   UserRoundSearch,
   MessagesSquare,
   RotateCcw,
+  Route,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "工作台", icon: LayoutDashboard },
+  { href: "/paths", label: "学习路径", icon: Route },
   { href: "/bank", label: "题库", icon: Layers },
   { href: "/experiences", label: "面经", icon: Newspaper },
   { href: "/interview", label: "模拟面试", icon: MessagesSquare },
@@ -30,9 +32,8 @@ export function AppSidebar() {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-surface/80 backdrop-blur">
       <div className="flex h-14 items-center gap-2.5 border-b border-line px-4">
-        <span className="brand-tile grid size-7 place-items-center rounded-lg text-xs font-bold text-white">
-          问
-        </span>
+        {/* 品牌 logo（问渠 Q 标志，public/brand/wenqu-mark.png；favicon 走 app/icon.png 约定） */}
+        <img src="/brand/wenqu-mark.png" alt="问渠 WenQu" className="size-8" />
         <div className="leading-tight">
           <div className="text-sm font-semibold tracking-wide">问渠 WenQu</div>
           <div className="text-xs text-ink-faint">大模型求职备战 · spec v0.3</div>
