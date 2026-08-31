@@ -21,7 +21,21 @@ SEED_ARTICLES = (
     "https://blog.csdn.net/m0_59235945/article/details/160747004",
     # 美团到店大模型算法一面
     "https://blog.csdn.net/m0_63171455/article/details/141757778",
+    # 小米 NLP 暑期实习；正文中给出了具体的一面题目。
+    "https://blog.csdn.net/2201_75499313/article/details/137187143",
+    # 智普清言 AIGC 产品实习，同次求职多轮合并。
+    "https://blog.csdn.net/2401_85324918/article/details/141036433",
+    # 上海 AI 实验室，多模态/图像方向，同场技术面与 HR 面合并。
+    "https://blog.csdn.net/2301_78285120/article/details/140137118",
+    # 理想汽车大模型算法，同一人的技术一面和二面合并。
+    "https://blog.csdn.net/2201_75499313/article/details/135833590",
+    # 字节算法实习；只摘录问题，不导入文章中的参考答案。
+    "https://blog.csdn.net/2201_75499313/article/details/135983223",
+    # 深信服大模型算法，同一候选人的基础面与技术面。
+    "https://blog.csdn.net/2201_75499313/article/details/137185530",
 )
+
+REVIEWED_COLLECTION_URL = "https://blog.csdn.net/linxid/article/details/137396018"
 
 
 def _clean_lines(text: str) -> str:
@@ -64,6 +78,53 @@ def parse_csdn_article(page_html: str, *, url: str) -> PostPreview:
     )
 
 
+def parse_csdn_reviewed_collection(page_html: str) -> list[PostPreview]:
+    """只读取已核验的两个可见公司章节，不把标题中的 20 家当成 20 条。"""
+    tree = HTMLParser(page_html)
+    body = tree.css_first("#content_views")
+    if body is None:
+        raise UpstreamError("CSDN 汇总缺少公开正文")
+    expected = ("淘天【offer】：", "字节AML【offer】：")
+    headings = [_clean_lines(node.text()) for node in body.css("h3")]
+    if tuple(headings) != expected:
+        raise UpstreamError("CSDN 汇总章节发生变化，需要重新审核", details={"headings": headings})
+    posts = []
+    title = ""
+    include = False
+    lines = []
+
+    def finish():
+        if title and lines:
+            posts.append(
+                PostPreview(
+                    url=REVIEWED_COLLECTION_URL,
+                    title=f"{title}大模型岗位面经（公开汇总摘录）",
+                    meta=(
+                        f"整理者 linxid；公开可见部分；章节：{title}；"
+                        "排除猎头提供的预备题库；不补全未展示部分"
+                    ),
+                    content="\n".join(lines),
+                )
+            )
+
+    for node in body.iter():
+        text = _clean_lines(node.text(separator=" "))
+        if node.tag == "h3":
+            finish()
+            title, lines, include = text, [], False
+        elif node.tag == "h4":
+            include = text in ("一面：", "二面：", "HR 面：", "HR面：")
+            if include:
+                lines.append(text)
+        elif include:
+            if node.tag in ("ol", "ul"):
+                lines.extend(_clean_lines(item.text(separator=" ")) for item in node.css("li"))
+            elif node.tag not in ("script", "style") and text:
+                lines.append(text)
+    finish()
+    return posts
+
+
 async def fetch_csdn_posts(client: PoliteClientProtocol, max_posts: int) -> list[PostPreview]:
     if max_posts <= 0:
         return []
@@ -71,4 +132,7 @@ async def fetch_csdn_posts(client: PoliteClientProtocol, max_posts: int) -> list
     for url in SEED_ARTICLES[:max_posts]:
         response = await client.get(url)
         posts.append(parse_csdn_article(response.text, url=url))
+    if len(posts) < max_posts:
+        response = await client.get(REVIEWED_COLLECTION_URL)
+        posts.extend(parse_csdn_reviewed_collection(response.text)[: max_posts - len(posts)])
     return posts
