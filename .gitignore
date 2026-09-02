@@ -11,12 +11,14 @@ node_modules/
 dist/
 .next/
 out/
+*.tsbuildinfo
 
 # 运行时数据与密钥
 data/
 logs/
 .env
 .env.*
+!apps/agents/.env.example
 *.local
 
 # 调研复用源码（各为独立 git 仓库，仅本地学习用，不随本项目提交）
@@ -28,3 +30,6 @@ Thumbs.db
 
 # ZCode 本地工件
 .zcode/
+
+# AI 助手工作记忆（本地会话日志，不随仓库公开）
+.workbuddy/
