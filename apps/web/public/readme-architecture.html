@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>问渠 · 能力闭环</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: #08090d;
+        color: #f7f8ff;
+      }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      body {
+        background:
+          radial-gradient(circle at 13% 14%, rgba(71, 90, 255, .18), transparent 31%),
+          radial-gradient(circle at 86% 79%, rgba(77, 205, 255, .10), transparent 30%),
+          linear-gradient(145deg, #090a10 0%, #0b0d14 55%, #090b12 100%);
+      }
+      .canvas { position: relative; width: 1440px; height: 900px; padding: 62px 72px 58px; }
+      .grid {
+        position: absolute; inset: 0; opacity: .16; pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: linear-gradient(to bottom, black, transparent 80%);
+      }
+      .eyebrow { display: flex; align-items: center; gap: 12px; color: #9fa8ff; font-size: 14px; letter-spacing: .18em; }
+      .mark { width: 30px; height: 30px; border: 1px solid rgba(123, 111, 255, .7); border-radius: 10px; position: relative; box-shadow: 0 0 26px rgba(91, 98, 255, .35); }
+      .mark::before { content: ""; position: absolute; inset: 7px; border: 2px solid #66d8ff; border-right-color: transparent; border-radius: 50%; }
+      h1 { margin: 18px 0 8px; font-size: 50px; line-height: 1.12; letter-spacing: -.04em; }
+      .sub { margin: 0; color: #959baa; font-size: 17px; }
+      .flow { position: relative; margin-top: 54px; display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 58px; }
+      .column { position: relative; z-index: 2; }
+      .label { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; color: #7f879a; font-size: 13px; font-weight: 700; letter-spacing: .14em; }
+      .label span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #fff; background: #232635; border: 1px solid #363a50; letter-spacing: 0; }
+      .stack { display: grid; gap: 14px; }
+      .card {
+        min-height: 116px; padding: 19px 20px; border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.095);
+        background: linear-gradient(145deg, rgba(24,27,39,.94), rgba(14,16,24,.91));
+        box-shadow: 0 22px 50px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.045);
+      }
+      .card.accent { border-color: rgba(112, 103, 255, .40); background: linear-gradient(145deg, rgba(42,40,82,.92), rgba(18,20,35,.96)); }
+      .card.cyan { border-color: rgba(83, 206, 255, .26); }
+      .icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; background: rgba(107,95,255,.14); border: 1px solid rgba(112,103,255,.25); color: #a9a3ff; font-size: 16px; }
+      .card-head { display: flex; align-items: center; gap: 12px; }
+      .title { font-size: 17px; font-weight: 700; }
+      .desc { margin: 11px 0 0 46px; color: #969dad; font-size: 13px; line-height: 1.55; }
+      .pill { display: inline-flex; margin-left: 8px; padding: 3px 8px; border-radius: 999px; color: #9be8ff; background: rgba(66,197,255,.08); border: 1px solid rgba(66,197,255,.17); font-size: 10px; font-weight: 700; vertical-align: 2px; }
+      .bridge { position: absolute; left: 30.2%; right: 29.7%; top: 152px; height: 2px; z-index: 1; background: linear-gradient(90deg, #5f55ff, #6e6dff 45%, #51cef7); opacity: .72; box-shadow: 0 0 22px rgba(84,121,255,.55); }
+      .bridge::before, .bridge::after { content: ""; position: absolute; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #8178ff; box-shadow: 0 0 16px #756cff; }
+      .bridge::before { left: 0; } .bridge::after { right: 0; background: #62d7ff; }
+      .bridge.b2 { top: 282px; opacity: .38; }
+      .bridge.b3 { top: 412px; opacity: .56; }
+      .loop {
+        position: absolute; right: 0; bottom: -54px; left: 0; height: 54px;
+        border: 1px solid rgba(91,116,255,.34); border-top: 0; border-radius: 0 0 40px 40px;
+      }
+      .loop::after { content: ""; position: absolute; left: -1px; top: -8px; width: 9px; height: 9px; border-left: 2px solid #6b73ff; border-top: 2px solid #6b73ff; transform: rotate(-45deg); }
+      .loop-label { position: absolute; left: 50%; bottom: -68px; transform: translateX(-50%); padding: 5px 12px; color: #8f97aa; background: #0a0c12; font-size: 12px; }
+      .footer { position: absolute; left: 72px; right: 72px; bottom: 30px; display: flex; justify-content: space-between; color: #626a7d; font-size: 12px; }
+      .footer strong { color: #9ca5b8; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <div class="grid"></div>
+      <div class="eyebrow"><span class="mark"></span>WENQU · 证据驱动的训练闭环</div>
+      <h1>从公开知识，到你的下一次更好回答</h1>
+      <p class="sub">模块各自独立，证据沿统一契约流动；任何一层都能单独替换、评测与优化。</p>
+
+      <section class="flow">
+        <div class="bridge"></div><div class="bridge b2"></div><div class="bridge b3"></div>
+        <div class="column">
+          <div class="label"><span>1</span>输入与事实</div>
+          <div class="stack">
+            <article class="card"><div class="card-head"><div class="icon">题</div><div class="title">题库与结构化面经</div></div><p class="desc">公司 × 岗位 × 轮次 × 频率，来源可回溯</p></article>
+            <article class="card"><div class="card-head"><div class="icon">简</div><div class="title">简历与目标 JD</div></div><p class="desc">经历、项目、技术栈与量化声明</p></article>
+            <article class="card"><div class="card-head"><div class="icon">码</div><div class="title">候选人的真实仓库</div></div><p class="desc">本地目录 / ZIP / 公共 Git，只读接入</p></article>
+          </div>
+        </div>
+
+        <div class="column">
+          <div class="label"><span>2</span>编排与证据层</div>
+          <div class="stack">
+            <article class="card accent"><div class="card-head"><div class="icon">卷</div><div class="title">证据化组卷 Harness</div></div><p class="desc">先经历与项目深挖，再高频题；语言、阶段与追问深度由确定性状态机约束</p></article>
+            <article class="card accent"><div class="card-head"><div class="icon">问</div><div class="title">模拟面试 / 项目拷打 <span class="pill">SSE</span></div></div><p class="desc">自然追问、语音交互、按需查证，不把候选人回答当事实</p></article>
+            <article class="card accent"><div class="card-head"><div class="icon">图</div><div class="title">Repository Intelligence</div></div><p class="desc">Tree-sitter repo map · pgvector · Git 归属 · 文件:行号</p></article>
+          </div>
+        </div>
+
+        <div class="column">
+          <div class="label"><span>3</span>输出与增长</div>
+          <div class="stack">
+            <article class="card cyan"><div class="card-head"><div class="icon">证</div><div class="title">证据链评分报告</div></div><p class="desc">理解、决策、表达、量化、诚实度逐项落证</p></article>
+            <article class="card cyan"><div class="card-head"><div class="icon">复</div><div class="title">SM-2 失分回流</div></div><p class="desc">忘了 / 模糊 / 掌握了，自动安排下一次复习</p></article>
+            <article class="card cyan"><div class="card-head"><div class="icon">路</div><div class="title">学习路径与掌握度</div></div><p class="desc">109 个节点、资源锚点、产出物与验收判据</p></article>
+          </div>
+        </div>
+        <div class="loop"></div><div class="loop-label">报告与掌握度回流到下一轮组卷</div>
+      </section>
+      <footer class="footer"><span><strong>本地优先</strong> · 数据与密钥不进仓库</span><span><strong>窄工具面</strong> · 模块化替换 · 显式失败</span></footer>
+    </main>
+  </body>
+</html>

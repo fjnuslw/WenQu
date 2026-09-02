@@ -36,8 +36,11 @@ interface ResumeProfile {
   exam_tags?: string[];
 }
 
+const SHOWCASE_RESUME_FILE = "README_SHOWCASE_SYNTHETIC_RESUME.pdf";
+
 export default function ResumePage() {
   const [resumes, setResumes] = useState<ResumeListItem[] | null>(null);
+  const [showcaseMode, setShowcaseMode] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [profile, setProfile] = useState<ResumeProfile | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -51,8 +54,19 @@ export default function ResumePage() {
   const loadList = useCallback(async () => {
     try {
       const data = await apiFetch<{ items: ResumeListItem[] }>("/api/resumes");
-      setResumes(data.items);
-      setSelectedId((current) => current ?? data.items[0]?.id ?? null);
+      const showcase =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showcase") === "1";
+      const visibleItems = showcase
+        ? data.items.filter((item) => item.file_name === SHOWCASE_RESUME_FILE)
+        : data.items;
+      setShowcaseMode(showcase);
+      setResumes(visibleItems);
+      setSelectedId((current) =>
+        current !== null && visibleItems.some((item) => item.id === current)
+          ? current
+          : (visibleItems[0]?.id ?? null),
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }
@@ -143,6 +157,12 @@ export default function ResumePage() {
         title="简历工作台"
         description="上传简历 → 结构化画像（实习/工作经历、项目、技术栈、考点标签）→ 模拟面试按原始声明深挖；项目要点同时是项目拷打的声明底稿。替换简历 = 删除旧版后重新上传。文件只存本地 data/uploads（已 gitignore，不会进 GitHub）。"
       />
+
+      {showcaseMode && (
+        <div className="mb-5 rounded-lg border border-accent/35 bg-accent-soft px-4 py-3 text-sm text-accent">
+          README 安全演示模式：本页只展示仓库内生成的合成简历，不读取或显示真实候选人信息。
+        </div>
+      )}
 
       <Card className="mb-5">
         <CardContent className="flex flex-col items-start gap-3 p-5">

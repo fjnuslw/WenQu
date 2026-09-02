@@ -38,6 +38,21 @@ const GRADE_BUTTONS = [
   { grade: "mastered", label: "掌握了", variant: "default" as const, hint: "拉长间隔" },
 ];
 
+const SHOWCASE_SESSION = "README_SHOWCASE_SYNTHETIC_SESSION";
+
+function showcaseMastery(items: ReviewItemOut[]): MasteryOut {
+  const byTag: MasteryOut["by_tag"] = {};
+  for (const item of items) {
+    const tag = item.tag ?? "未分类";
+    const stats = byTag[tag] ?? { total: 0, mastered: 0, learning: 0, due: 0 };
+    stats.total += 1;
+    stats.learning += 1;
+    if (item.overdue) stats.due += 1;
+    byTag[tag] = stats;
+  }
+  return { total: items.length, mastered: 0, learning: items.length, due: items.length, by_tag: byTag };
+}
+
 export default function ReviewPage() {
   const [items, setItems] = useState<ReviewItemOut[] | null>(null);
   const [mastery, setMastery] = useState<MasteryOut | null>(null);
@@ -46,6 +61,7 @@ export default function ReviewPage() {
   const [fetching, setFetching] = useState(false);
   const [gradingId, setGradingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showcaseMode, setShowcaseMode] = useState(false);
 
   const load = useCallback(async () => {
     setFetching(true);
@@ -55,9 +71,16 @@ export default function ReviewPage() {
         apiFetch<{ total: number; items: ReviewItemOut[] }>(`/api/review?scope=${scope}&limit=100`),
         apiFetch<MasteryOut>("/api/review/mastery"),
       ]);
-      setItems(data.items);
-      setTotal(data.total);
-      setMastery(masteryData);
+      const showcase =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("showcase") === "1";
+      const visibleItems = showcase
+        ? data.items.filter((item) => item.source_ref === SHOWCASE_SESSION)
+        : data.items;
+      setShowcaseMode(showcase);
+      setItems(visibleItems);
+      setTotal(showcase ? visibleItems.length : data.total);
+      setMastery(showcase ? showcaseMastery(visibleItems) : masteryData);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -96,6 +119,12 @@ export default function ReviewPage() {
         title="复习队列"
         description="评分报告的失分点自动回流到这里，SM-2 间隔重复安排复习节奏——掌握了才拉长间隔。"
       />
+
+      {showcaseMode && (
+        <div className="mb-5 rounded-lg border border-accent/35 bg-accent-soft px-4 py-3 text-sm text-accent">
+          README 安全演示模式：复习卡来自合成面试，不展示真实候选人的失分记录。
+        </div>
+      )}
 
       {mastery && mastery.total > 0 && (
         <Card className="mb-5">
