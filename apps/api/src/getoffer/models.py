@@ -147,9 +147,36 @@ class QuestionCompany(Base, IntPkMixin):
     role: Mapped[str] = mapped_column(String(64), default="default", nullable=False)
     freq: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     last_seen: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # 频率来源：ai=LLM 推断（K1 阶段产物）· experience=面经实证（可追溯到具体条目）
+    # 区分二者是为了「频率榜可追溯到面经条目」（F2 验收）与避免实证被推断值覆盖
+    source: Mapped[str] = mapped_column(String(16), default="ai", nullable=False)
 
     question: Mapped[Question] = relationship(back_populates="company_stats")
     company: Mapped[Company] = relationship()
+
+
+class QuestionCompanyEvidence(Base, IntPkMixin):
+    """频率证据：把 question_companies 的 freq 追溯到具体面经条目。
+
+    一条面经里同一道题可能出现在多个追问节点，用 (question, item) 唯一约束
+    保证重复跑校准脚本是幂等的，不会把 freq 越跑越大。
+    """
+
+    __tablename__ = "question_company_evidence"
+    __table_args__ = (UniqueConstraint("question_id", "experience_item_id"),)
+
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"), nullable=False)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
+    experience_id: Mapped[int] = mapped_column(ForeignKey("experiences.id"), nullable=False)
+    experience_item_id: Mapped[int] = mapped_column(
+        ForeignKey("experience_items.id"), nullable=False
+    )
+    # 匹配置信度（IDF 加权包含度，0~1），保留以便后续调阈值时不必重跑匹配
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+
+    question: Mapped[Question] = relationship()
+    company: Mapped[Company] = relationship()
+    experience_item: Mapped["ExperienceItem"] = relationship()
 
 
 class Experience(Base, IntPkMixin, TimestampMixin):
@@ -335,6 +362,7 @@ class LLMCall(Base, IntPkMixin):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+
 class ReviewItem(Base, IntPkMixin, TimestampMixin):
     """失分点复习队列（F6，SM-2 间隔重复）。评分报告的 weaknesses 自动回流。"""
 
@@ -354,3 +382,40 @@ class ReviewItem(Base, IntPkMixin, TimestampMixin):
     lapses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
     due_on: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
+
+
+class LearningEnrollment(Base, IntPkMixin):
+    """学习路径订阅与目标设定（F7）。目录本身不落库，这里只存用户侧状态。"""
+
+    __tablename__ = "learning_enrollments"
+    __table_args__ = (UniqueConstraint("path_slug"),)
+
+    path_slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    target_role: Mapped[str] = mapped_column(String(128), default="", nullable=False)
+    daily_minutes: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
+    started_on: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
+    target_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class LearningNodeProgress(Base, IntPkMixin):
+    """单个学习节点的进度（F7）。
+
+    node_id 是目录里的字符串 id 而非外键——目录增删节点不会破坏历史进度，
+    废弃节点在前端折叠显示即可（spec 续二十二 §4）。
+    """
+
+    __tablename__ = "learning_node_progress"
+    __table_args__ = (
+        UniqueConstraint("node_id"),
+        Index("ix_node_progress_status", "status"),
+    )
+
+    node_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="todo", nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

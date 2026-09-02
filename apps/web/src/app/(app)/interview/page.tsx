@@ -7,7 +7,7 @@ export default function InterviewPage() {
     <div className="mx-auto max-w-5xl p-8">
       <PageHeader
         title="模拟面试"
-        description="检索增强组卷（公司频率榜 × 简历押题 × 面经追问）+ 七阶段状态机 + 评分报告与失分点回流。"
+        description="证据化组卷（简历经历/项目深挖 × 公司高频题 × 面经追问）+ 七阶段状态机 + 评分报告与失分点回流。"
       />
       <InterviewStartForm />
       <RecentInterviews />

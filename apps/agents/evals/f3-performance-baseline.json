@@ -1,0 +1,41 @@
+{
+  "evaluatedAt": "2026-09-01T10:52:26.222Z",
+  "model": "deepseek-v4-flash-vision-exp",
+  "thinkingLevel": "medium",
+  "protocolVariant": "one_step_question_arg",
+  "implementationSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+  "fixtureSha256": "d4731073f2d6f4fc231d54a6f609addafde6d779719c234dfe56882c54a3aa09",
+  "fixtureIds": [
+    "SI-01",
+    "SI-02",
+    "SI-03",
+    "SI-04",
+    "SI-05",
+    "SI-06",
+    "SI-07",
+    "SI-08",
+    "RAG-01",
+    "RAG-02"
+  ],
+  "command": "npm run eval:f3:performance -- --limit 10 --thinking medium",
+  "metrics": {
+    "pairCount": 10,
+    "decisionCoverage": 1.0,
+    "retryRate": 0.0,
+    "legacyP50LatencyMs": 3372,
+    "legacyP95LatencyMs": 5990,
+    "v2P50LatencyMs": 3400,
+    "v2P95LatencyMs": 5863,
+    "p50Ratio": 1.0083036773428233
+  },
+  "thresholds": {
+    "maximumP50Ratio": 2.2,
+    "decisionCoverage": 1.0,
+    "retryRate": 0.0
+  },
+  "passed": true,
+  "notes": [
+    "按样本奇偶交替 legacy-first / v2-first，降低固定调用顺序造成的网络漂移。",
+    "当前一步协议 p50 为旧路径的 1.008 倍，p95 略低；硬门槛只约束 p50，避免把单次网络尾延迟误判为协议回归。"
+  ]
+}

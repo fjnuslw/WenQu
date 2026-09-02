@@ -22,6 +22,7 @@ const personaSchema = z.object({
   jd: z.string().optional(),
   brief: z.string().optional(),
   resumeHighlights: z.array(z.string()).optional(),
+  interviewLanguage: z.enum(["zh-CN", "en-US"]).optional(),
 });
 
 const grillBriefingModuleSchema = z.object({
@@ -66,6 +67,7 @@ const createSchema = z.object({
       z.object({
         id: z.number().int(),
         stem: z.string().min(1),
+        displayStem: z.string().min(1).max(240).optional(),
         kind: z.string(),
         answer: z
           .string()
@@ -73,6 +75,14 @@ const createSchema = z.object({
           .optional()
           .transform((value) => value ?? null),
         probes: z.array(z.string().min(1)).max(3).optional(),
+        source: z.enum(["bank", "resume"]).optional(),
+        grounding: z
+          .object({
+            kind: z.enum(["experience", "project", "highlight"]),
+            label: z.string().min(1),
+            evidence: z.string().min(1),
+          })
+          .optional(),
       }),
     )
     .max(20)
@@ -80,10 +90,24 @@ const createSchema = z.object({
   grill: grillSchema.optional(),
 });
 
-const turnSchema = z.object({
-  text: z.string().min(1),
-  vagueAnswer: z.boolean().optional(),
-});
+const turnSchema = z
+  .object({
+    text: z.string().min(1),
+  })
+  .strict();
+
+/**
+ * Zod issue 是对象，直接 String(issue) 会得到 "[object Object]"——
+ * 校验失败时看不到是哪个字段、什么原因，只能靠猜。这里提取路径+消息。
+ */
+function formatIssues(issues: z.ZodIssue[]): string {
+  return issues
+    .map((issue) => {
+      const path = issue.path.join(".");
+      return path ? `${path}: ${issue.message}` : issue.message;
+    })
+    .join("; ");
+}
 
 function errorBody(code: string, message: string) {
   return { error: { code, message } };
@@ -109,10 +133,13 @@ app.post("/sessions", async (c) => {
   }
   const parsed = createSchema.safeParse(await c.req.json());
   if (!parsed.success) {
-    return c.json(errorBody("validation_failed", parsed.error.issues.map(String).join("; ")), 422);
+    return c.json(errorBody("validation_failed", formatIssues(parsed.error.issues)), 422);
   }
   if (parsed.data.mode === "grill" && !parsed.data.grill) {
     return c.json(errorBody("validation_failed", "mode=grill 需要 grill 上下文（projectId/repoRoot/briefing）"), 422);
+  }
+  if (parsed.data.mode === "mock" && (!parsed.data.questions || parsed.data.questions.length === 0)) {
+    return c.json(errorBody("validation_failed", "mode=mock 必须提供非空题单（F3 v2 不再支持无题单 legacy 模式）"), 422);
   }
   const id = await manager.create(parsed.data);
   return c.json({ id }, 201);
@@ -127,7 +154,6 @@ app.post("/sessions/:id/turn", async (c) => {
     throw error;
   }
   const rawBody = await c.req.text();
-  console.log(`[turn] raw body (${rawBody.length} bytes):`, rawBody.slice(0, 240));
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(rawBody);
@@ -136,7 +162,7 @@ app.post("/sessions/:id/turn", async (c) => {
   }
   const parsed = turnSchema.safeParse(parsedJson);
   if (!parsed.success) {
-    return c.json(errorBody("validation_failed", parsed.error.issues.map(String).join("; ")), 422);
+    return c.json(errorBody("validation_failed", formatIssues(parsed.error.issues)), 422);
   }
 
   return streamSSE(c, async (stream) => {
@@ -246,11 +272,23 @@ app.get("/sessions/:id/history", async (c) => {
   }
   const messages: { role: "candidate" | "interviewer"; text: string; thinking: string; thinkSeconds: number | null }[] = [];
   let thinkStartedAt: number | null = null;
+  let sessionConfig: Record<string, unknown> = {};
+  type HistoryRuntimeState = {
+    phase?: string;
+    followUpDepth?: number;
+    status?: string;
+    currentTarget?: { kind?: string; index?: number } | null;
+  };
+  let latestState: HistoryRuntimeState | null = null;
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     try {
       const entry = JSON.parse(line) as Record<string, unknown>;
-      if (entry.type === "user") {
+      if (entry.type === "session_start") {
+        sessionConfig = (entry.config ?? {}) as Record<string, unknown>;
+      } else if (entry.type === "state_transition") {
+        latestState = (entry.after ?? null) as HistoryRuntimeState | null;
+      } else if (entry.type === "user") {
         messages.push({ role: "candidate", text: String(entry.text ?? ""), thinking: "", thinkSeconds: null });
       } else if (entry.type === "assistant") {
         const ts = typeof entry.ts === "string" ? Date.parse(entry.ts) : null;
@@ -258,12 +296,16 @@ app.get("/sessions/:id/history", async (c) => {
         if (thinkStartedAt !== null && ts !== null) {
           thinkSeconds = Math.max(0, (ts - thinkStartedAt) / 1000);
         }
+        const exposeThinking = sessionConfig.mode !== "mock";
         messages.push({
           role: "interviewer",
           text: String(entry.text ?? ""),
-          thinking: String(entry.thinking ?? ""),
-          thinkSeconds,
+          thinking: exposeThinking ? String(entry.thinking ?? "") : "",
+          thinkSeconds: exposeThinking ? thinkSeconds : null,
         });
+        if (!latestState && entry.state && typeof entry.state === "object") {
+          latestState = entry.state as HistoryRuntimeState;
+        }
         thinkStartedAt = null;
       }
       if (entry.type === "user") thinkStartedAt = typeof entry.ts === "string" ? Date.parse(entry.ts) : null;
@@ -272,7 +314,51 @@ app.get("/sessions/:id/history", async (c) => {
     }
   }
   const alive = sessionAlive(id);
-  return c.json({ id, alive, messages });
+  const questions = Array.isArray(sessionConfig.questions)
+    ? (sessionConfig.questions as Array<{
+        stem?: unknown;
+        displayStem?: unknown;
+        kind?: unknown;
+        source?: unknown;
+        grounding?: { label?: unknown };
+      }>)
+    : [];
+  const target = latestState?.currentTarget;
+  const questionIndex = target?.kind === "plan_question" && typeof target.index === "number" ? target.index : null;
+  const question = questionIndex === null ? null : questions[questionIndex];
+  const persona =
+    sessionConfig.persona && typeof sessionConfig.persona === "object"
+      ? (sessionConfig.persona as Record<string, unknown>)
+      : {};
+  const language = persona.interviewLanguage === "en-US" ? "en-US" : "zh-CN";
+  return c.json({
+    id,
+    alive,
+    language,
+    messages,
+    state: latestState
+      ? {
+          phase: latestState.phase ?? "opening",
+          followUpDepth: latestState.followUpDepth ?? 0,
+          status: latestState.status ?? "active",
+        }
+      : null,
+    question:
+      questionIndex !== null && question && typeof question.stem === "string"
+        ? {
+            index: questionIndex + 1,
+            total: questions.length,
+            stem:
+              typeof question.displayStem === "string" && question.displayStem.trim()
+                ? question.displayStem
+                : question.stem,
+            kind: typeof question.kind === "string" ? question.kind : "knowledge",
+            source: question.source === "resume" ? "resume" : "bank",
+            groundingLabel:
+              typeof question.grounding?.label === "string" ? question.grounding.label : undefined,
+          }
+        : null,
+  });
 });
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {

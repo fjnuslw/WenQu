@@ -27,6 +27,8 @@ interface QuestionProgress {
   index: number;
   total: number;
   stem: string;
+  source?: "bank" | "resume";
+  groundingLabel?: string;
 }
 
 interface EvidenceRef {
@@ -291,6 +293,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [phase, setPhase] = useState("opening");
+  const [interviewLanguage, setInterviewLanguage] = useState<"zh-CN" | "en-US">("zh-CN");
   const [question, setQuestion] = useState<QuestionProgress | null>(null);
   const [followUpDepth, setFollowUpDepth] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -302,8 +305,10 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const thinkStartedAtRef = useRef<number | null>(null);
+  const interviewerReplyRef = useRef("");
 
   const currentPhase = INTERVIEW_PHASES.find((p) => p.id === phase);
+  const conversationClosed = !isAnswerMode && phase === "closing";
 
   // 历史（刷新/回访继续）：JSONL 重放；alive=false 表示 agents 重启过 → 只读回放
   // 答题模式且无历史时自动发出首问；有历史则不重复发。
@@ -318,9 +323,18 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           const data = (await response.json()) as {
             alive: boolean;
             messages: ChatMessage[];
+            state?: { phase?: string; followUpDepth?: number; status?: string } | null;
+            question?: QuestionProgress | null;
+            language?: "zh-CN" | "en-US";
           };
           setSessionAlive(data.alive);
           aliveNow = data.alive;
+          if (data.state?.phase) setPhase(data.state.phase);
+          if (data.language === "en-US" || data.language === "zh-CN") {
+            setInterviewLanguage(data.language);
+          }
+          if (typeof data.state?.followUpDepth === "number") setFollowUpDepth(data.state.followUpDepth);
+          if (data.question) setQuestion(data.question);
           if (data.messages.length > 0) {
             setMessages(data.messages);
             hasHistory = true;
@@ -352,8 +366,8 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   // 语音（spec 续十七）：麦克风实时转写进输入框；TTS 朗读面试官回复（可开关）
   const speech = useSpeechRecognition((finalText) => {
     setDraft((current) => (current ? `${current} ${finalText}` : finalText));
-  });
-  const tts = useSpeechSynthesis();
+  }, interviewLanguage);
+  const tts = useSpeechSynthesis(interviewLanguage);
 
   // 思考栏默认跟随最新有思考内容的消息；点击气泡可回看历史思考
   const lastThinkingIdx = (() => {
@@ -398,6 +412,8 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
   async function send(forcedText?: string) {
     const text = (forcedText ?? draft).trim();
     if (!text || busy) return;
+    tts.stop();
+    interviewerReplyRef.current = "";
     setBusy(true);
     setError(null);
     if (!forcedText) setDraft("");
@@ -422,6 +438,7 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       await consumeTurnStream(response, {
         onDelta: (delta) => {
           settleThinking(); // 首个正文增量 = 思考结束
+          interviewerReplyRef.current += delta;
           setMessages((current) => {
             const next = [...current];
             const last = next[next.length - 1];
@@ -440,7 +457,13 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           });
         },
         onEvent: (event) => {
-          if (event.type === "phase" && typeof event.phase === "string") setPhase(event.phase);
+          if (event.type === "phase" && typeof event.phase === "string") {
+            setPhase(event.phase);
+            if (event.phase === "closing") setQuestion(null);
+          }
+          if (event.type === "decision" && typeof event.followUpDepth === "number") {
+            setFollowUpDepth(event.followUpDepth);
+          }
           if (event.type === "followup" && typeof event.level === "number") setFollowUpDepth(event.level);
           if (event.type === "error") setError(String(event.message));
           if (
@@ -449,22 +472,26 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
             typeof event.total === "number" &&
             typeof event.stem === "string"
           ) {
-            setQuestion({ index: event.index, total: event.total, stem: event.stem });
+            setQuestion({
+              index: event.index,
+              total: event.total,
+              stem: event.stem,
+              source: event.source === "resume" ? "resume" : "bank",
+              groundingLabel:
+                typeof event.groundingLabel === "string" ? event.groundingLabel : undefined,
+            });
           }
         },
       });
       settleThinking();
+      const reply = interviewerReplyRef.current.trim();
+      if (reply) void tts.speak(reply);
     } catch (caught) {
       settleThinking();
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setBusy(false);
       scrollToEnd();
-      setMessages((current) => {
-        const last = current[current.length - 1];
-        if (last?.role === "interviewer" && last.text) tts.speak(last.text);
-        return current;
-      });
     }
   }
 
@@ -492,7 +519,8 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       {question && (
         <div className="mb-3 rounded-lg border border-accent/30 bg-accent-soft/60 px-3.5 py-2.5">
           <div className="text-xs font-medium text-accent">
-            当前题目（{question.index}/{question.total}）
+            {question.source === "resume" ? "简历深挖" : "题库题"}（{question.index}/{question.total}）
+            {question.groundingLabel ? ` · ${question.groundingLabel}` : ""}
           </div>
           <div className="mt-0.5 line-clamp-2 text-xs text-ink">{question.stem}</div>
         </div>
@@ -542,10 +570,17 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       </div>
 
       {error && <p className="mt-2 text-sm text-danger">出错了：{error}</p>}
+      {tts.error && <p className="mt-2 text-xs text-danger">语音播报失败：{tts.error}</p>}
 
       {historyLoaded && !sessionAlive && (
         <p className="mt-2 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
           该会话在服务重启后过期：可完整回放下方对话，但不能继续发送。要继续拷打请开新会话。
+        </p>
+      )}
+
+      {conversationClosed && (
+        <p className="mt-2 rounded-md border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-ink-dim">
+          本场面试已结束。你可以生成评分报告，或返回面试首页开始新会话。
         </p>
       )}
 
@@ -554,12 +589,38 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
       )}
 
       <div className="mt-4">
-        <div className="flex gap-2">
+        {tts.enabled && tts.usesBrowser && tts.voiceOptions.length > 0 && (
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-line bg-surface/60 px-3 py-2">
+            <label className="shrink-0 text-xs text-ink-dim" htmlFor="interviewer-voice">
+              面试官音色
+            </label>
+            <select
+              id="interviewer-voice"
+              className="h-8 min-w-0 max-w-sm flex-1 rounded-md border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-accent"
+              value={tts.selectedVoiceId ?? ""}
+              onChange={(event) => {
+                tts.stop();
+                tts.selectBrowserVoice(event.target.value);
+                tts.previewBrowserVoice(event.target.value);
+              }}
+              title="选择当前面试语言下的浏览器音色；切换后会播放一句试听"
+            >
+              {tts.voiceOptions.map((voice) => (
+                <option key={voice.id} value={voice.id}>
+                  {voice.quality === "natural" ? "自然" : voice.quality === "basic" ? "基础" : "标准"}
+                  {` · ${voice.name} (${voice.lang})`}
+                </option>
+              ))}
+            </select>
+            <span className="hidden shrink-0 text-xs text-ink-faint sm:inline">切换即试听</span>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
           <Input
-            className="h-10"
-            placeholder={inputPlaceholder}
+            className="h-10 min-w-[220px] flex-1"
+            placeholder={conversationClosed ? "本场面试已结束" : inputPlaceholder}
             value={draft}
-            disabled={busy || (historyLoaded && !sessionAlive)}
+            disabled={busy || conversationClosed || (historyLoaded && !sessionAlive)}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.nativeEvent.isComposing) void send();
@@ -568,8 +629,16 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           {speech.supported && (
             <Button
               variant={speech.listening ? "danger" : "secondary"}
-              className="h-10 px-3"
-              onClick={() => (speech.listening ? speech.stop() : speech.start())}
+              className="h-10 shrink-0 px-3"
+              disabled={conversationClosed}
+              onClick={() => {
+                if (speech.listening) {
+                  speech.stop();
+                } else {
+                  tts.stop();
+                  speech.start();
+                }
+              }}
               title={speech.listening ? "停止录音（转写已进输入框，可编辑后发送）" : "按住思路说话：实时转写进输入框"}
             >
               {speech.listening ? <MicOff className="size-4 animate-pulse" /> : <Mic className="size-4" />}
@@ -578,24 +647,33 @@ export function ChatRoom({ sessionId }: { sessionId: string }) {
           {tts.supported && (
             <Button
               variant={tts.enabled ? "default" : "secondary"}
-              className="h-10 px-3"
-              onClick={() => tts.setEnabled((value) => !value)}
-              title={tts.enabled ? "朗读已开：面试官回复自动语音播报，点此关闭" : "开启语音播报（面试官回复朗读）"}
+              className="h-10 shrink-0 px-3"
+              onClick={() =>
+                tts.setEnabled((value) => {
+                  if (value) tts.stop();
+                  return !value;
+                })
+              }
+              title={
+                tts.enabled
+                  ? `朗读已开：${tts.providerLabel}，点此关闭`
+                  : `开启语音播报（${tts.providerLabel}）`
+              }
             >
               {tts.enabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
             </Button>
           )}
           <Button
-            className="h-10 px-4"
+            className="h-10 shrink-0 px-4"
             onClick={() => void send()}
-            disabled={busy || draft.trim().length === 0 || (historyLoaded && !sessionAlive)}
+            disabled={busy || conversationClosed || draft.trim().length === 0 || (historyLoaded && !sessionAlive)}
           >
             <SendHorizonal className="size-4" />
           </Button>
           {!isAnswerMode && (
             <Button
               variant="secondary"
-              className="h-10"
+              className="h-10 shrink-0 whitespace-nowrap"
               onClick={() => void generateReport()}
               disabled={reportBusy || report !== null}
               title={report ? "报告已生成" : "对本场面试生成评分报告"}

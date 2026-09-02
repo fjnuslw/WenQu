@@ -13,6 +13,7 @@ from getoffer.errors import UpstreamError, install_error_handlers
 from getoffer.llm.gateway import LLMGateway
 from getoffer.models import LLMCall
 from getoffer.search.meili import QUESTIONS_INDEX, MeiliIndexer
+from getoffer.voice import VoiceGateway
 
 logger = logging.getLogger("getoffer.api")
 
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
             settings.llm,
             usage_sink=lambda usage: _record_llm_usage(app.state.sessionmaker, usage),
         )
+        app.state.voice_gateway = VoiceGateway(settings.tts)
         app.state.meili = MeiliIndexer(settings)
         try:
             await app.state.meili.ensure_index(QUESTIONS_INDEX)
@@ -51,6 +53,7 @@ def create_app() -> FastAPI:
                 await conn.run_sync(Base.metadata.create_all)
         yield
         await app.state.gateway.aclose()
+        await app.state.voice_gateway.aclose()
         await app.state.meili.aclose()
         await app.state.engine.dispose()
 
@@ -76,7 +79,9 @@ def create_app() -> FastAPI:
         review,
         sessions,
         stats,
+        voice,
     )
+    from getoffer.paths import router as paths
 
     app.include_router(ingest.router)
     app.include_router(questions.router)
@@ -88,6 +93,8 @@ def create_app() -> FastAPI:
     app.include_router(review.router)
     app.include_router(grill.router)
     app.include_router(stats.router)
+    app.include_router(voice.router)
+    app.include_router(paths.router)
 
     @app.get("/api/health")
     async def health() -> dict:

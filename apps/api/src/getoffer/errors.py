@@ -73,6 +73,17 @@ class NotImplementedYet(AppError):
     code = "not_implemented_yet"
 
 
+class PathsCatalogError(AppError):
+    """学习路径目录（受版本控制的 JSON）加载或交叉引用校验失败。
+
+    目录是内容而非用户数据，任何不一致都应在启动/首次访问时显式暴露，
+    不做「跳过坏节点」的静默降级（spec §7）。
+    """
+
+    http_status = 500
+    code = "paths_catalog_error"
+
+
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:  # noqa: ARG001

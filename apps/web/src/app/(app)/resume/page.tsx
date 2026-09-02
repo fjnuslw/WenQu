@@ -141,7 +141,7 @@ export default function ResumePage() {
     <div className="mx-auto max-w-4xl p-8">
       <PageHeader
         title="简历工作台"
-        description="上传简历 → 结构化画像（技术栈/项目要点/考点标签）→ 模拟面试按简历押题；项目要点同时是项目拷打的声明底稿。替换简历 = 删除旧版后重新上传。文件只存本地 data/uploads（已 gitignore，不会进 GitHub）。"
+        description="上传简历 → 结构化画像（实习/工作经历、项目、技术栈、考点标签）→ 模拟面试按原始声明深挖；项目要点同时是项目拷打的声明底稿。替换简历 = 删除旧版后重新上传。文件只存本地 data/uploads（已 gitignore，不会进 GitHub）。"
       />
 
       <Card className="mb-5">
@@ -321,7 +321,7 @@ export default function ResumePage() {
       {resumes && resumes.length === 0 && !uploading && (
         <Card>
           <CardContent className="p-8 text-center text-sm text-ink-dim">
-            还没有简历。上传后即可在「模拟面试」按简历押题组卷。
+            还没有简历。上传后即可在「模拟面试」按真实经历和项目进行证据化深挖。
           </CardContent>
         </Card>
       )}

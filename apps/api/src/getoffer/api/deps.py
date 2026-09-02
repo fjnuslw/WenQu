@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from getoffer.config import Settings
 from getoffer.llm.gateway import LLMGateway
 from getoffer.search.meili import MeiliIndexer
+from getoffer.voice import VoiceGateway
 
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
@@ -30,3 +31,7 @@ def get_indexer(request: Request) -> MeiliIndexer:
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def get_voice_gateway(request: Request) -> VoiceGateway:
+    return request.app.state.voice_gateway

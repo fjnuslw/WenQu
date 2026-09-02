@@ -21,7 +21,7 @@ from getoffer.models import InterviewSession, ReviewItem
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
-MAX_LOG_ENTRIES = 80  # 防止超长面试撑爆上下文
+MAX_TRANSCRIPT_ENTRIES = 80  # 只对 user/assistant 计数，领域控制事件不占报告上下文预算
 
 
 class EvidenceRef(BaseModel):
@@ -93,7 +93,8 @@ def _load_transcript(log_path: Path) -> dict[str, Any]:
             config = entry.get("config") or {}
         entries.append(entry)
     transcript_parts: list[str] = []
-    for entry in entries[-MAX_LOG_ENTRIES:]:
+    dialogue_entries = [entry for entry in entries if entry.get("type") in {"user", "assistant"}]
+    for entry in dialogue_entries[-MAX_TRANSCRIPT_ENTRIES:]:
         kind = entry.get("type")
         if kind == "user":
             note = entry.get("director_note")

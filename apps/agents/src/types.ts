@@ -23,14 +23,25 @@ export interface PersonaConfig {
   brief?: string;
   /** 候选人简历要点（I1：api 简历解析管道产出） */
   resumeHighlights?: string[];
+  /** 候选人可见提问语言；默认中文，英文必须由入口显式选择。 */
+  interviewLanguage?: "zh-CN" | "en-US";
 }
 
 /** 组卷题单中的一道题（来自 api /api/interview/plan）。 */
 export interface PlanQuestion {
   id: number;
+  /** 题库/证据的 canonical 文本，仅用于溯源和判断。 */
   stem: string;
+  /** 候选人可见表达；组卷阶段完成语言本地化，实时模型不得重写下一题。 */
+  displayStem?: string;
   kind: string;
   answer: string | null;
+  source?: "bank" | "resume";
+  grounding?: {
+    kind: "experience" | "project" | "highlight";
+    label: string;
+    evidence: string;
+  };
   /** 该公司真实面经的追问素材（api 从 experience_items 检索，面试官择用） */
   probes?: string[];
 }
@@ -99,7 +110,16 @@ export type ClientEvent =
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
   | { type: "phase"; phase: Phase }
+  | { type: "decision"; action: "probe" | "advance"; followUpDepth: number; forced: boolean }
   | { type: "followup"; level: number }
-  | { type: "question"; index: number; total: number; stem: string; kind: string }
+  | {
+      type: "question";
+      index: number;
+      total: number;
+      stem: string;
+      kind: string;
+      source?: "bank" | "resume";
+      groundingLabel?: string;
+    }
   | { type: "final"; outcome: TurnOutcome }
   | { type: "error"; message: string };

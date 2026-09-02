@@ -1,0 +1,79 @@
+{
+  "auditedAt": "2026-09-01T11:29:29.826Z",
+  "sourceSessionId": "1aee86be-94a0-462e-8679-7abc924e971c",
+  "protocolVariant": "one_step_question_arg",
+  "implementationSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+  "dataClass": "repository-authored synthetic fixtures",
+  "auditMethod": "逐条人工语义审计 JSONL 中候选人可见的 probe 回复；不读取隐藏思维链",
+  "rubric": "追问必须承接当前 target，并针对候选人刚才回答中影响核心判断的明确缺口；泛泛要求‘再详细些’或一次抛出多个主要问题不计相关。",
+  "sampleCount": 9,
+  "relevantCount": 9,
+  "relevanceRate": 1.0,
+  "threshold": 0.8,
+  "passed": true,
+  "samples": [
+    {
+      "turnNo": 1,
+      "target": "self_intro",
+      "followUpQuestion": "能否举一个你实际参与过的具体项目，说清你个人的贡献点和最终结果，哪怕只给一个可验证的指标或技术取舍？",
+      "judgment": "候选人没有给出可核验经历；追问聚焦一个项目及个人贡献、结果证据。",
+      "relevant": true
+    },
+    {
+      "turnNo": 3,
+      "target": "请说明一个生产级 RAG 的完整链路。",
+      "followUpQuestion": "那就从你项目里实际跑通的链路说起，检索阶段你具体用了哪些召回方式，又是怎么把召回的片段压到给模型的那几段的？",
+      "judgment": "承接生产级 RAG 链路，具体核实召回与重排这一个连续处理环节。",
+      "relevant": true
+    },
+    {
+      "turnNo": 5,
+      "target": "为什么常把 BM25 和向量召回组合起来？",
+      "followUpQuestion": "就按你自己的理解说，BM25 和向量召回各自的优势或局限分别是什么，为什么放在一起会比单用一个更稳？",
+      "judgment": "紧扣混合召回的互补性，要求说明组合优于单路的核心理由。",
+      "relevant": true
+    },
+    {
+      "turnNo": 7,
+      "target": "如何评价检索阶段是否有效？",
+      "followUpQuestion": "要判断检索是否有效，你会在标注集上主要看哪几个指标，为什么选它们而不是别的？",
+      "judgment": "把含糊回答收敛到检索评测的指标选择与理由。",
+      "relevant": true
+    },
+    {
+      "turnNo": 9,
+      "target": "文档切分为什么不能固定按 500 字一刀切？",
+      "followUpQuestion": "固定按长度切分在实际文档里会把哪些本该连在一起的内容拆开，拆开后对召回会带来什么具体影响？",
+      "judgment": "直接核实固定长度切分破坏语义边界及其检索后果。",
+      "relevant": true
+    },
+    {
+      "turnNo": 11,
+      "target": "知识库更新后，怎样避免用户召回旧内容？",
+      "followUpQuestion": "新数据写入后，检索是靠着什么机制读到新版本而不是旧版本，切换过程怎么保证用户不会同时看到新旧两套内容？",
+      "judgment": "聚焦版本可见性与切换一致性，正是旧内容召回问题的关键缺口。",
+      "relevant": true
+    },
+    {
+      "turnNo": 13,
+      "target": "Reranker 在 RAG 中解决什么问题，代价是什么？",
+      "followUpQuestion": "重排相比前面的召回能多解决什么问题，而它又为什么会带来额外的延迟或成本？",
+      "judgment": "完整覆盖 reranker 的增益与代价这一组核心权衡。",
+      "relevant": true
+    },
+    {
+      "turnNo": 15,
+      "target": "Agent 工具调用为什么需要参数 schema？",
+      "followUpQuestion": "参数 schema 对模型和运行时各起什么作用，它主要是用来约束和校验哪些东西的？",
+      "judgment": "核实 schema 在模型契约和运行时验证两侧的作用，没有转向无关实现。",
+      "relevant": true
+    },
+    {
+      "turnNo": 17,
+      "target": "如何防止 Agent 重试时重复创建订单？",
+      "followUpQuestion": "重试进来时，系统靠什么机制判断上一次到底有没有创建成功，从而决定要不要再下一单？",
+      "judgment": "紧扣重试副作用与幂等判断，要求说明是否再次执行的判定机制。",
+      "relevant": true
+    }
+  ]
+}

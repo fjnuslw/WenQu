@@ -5,8 +5,9 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_ROOT = Path(__file__).resolve().parents[2]  # apps/api
@@ -26,6 +27,19 @@ class LLMProviderConfig(BaseModel):
     # 思考型模型的推理开关（DeepSeek: thinking={"type":"disabled"}）。
     # 结构化抽取/评分等机械任务默认关闭：更快更省，也避免推理挤占输出预算。
     disable_thinking: bool = True
+
+
+class TTSProviderConfig(BaseModel):
+    """候选人可见语音的服务端 Provider；disabled 时 Web 使用显式浏览器回退。"""
+
+    provider: Literal["disabled", "openai_compatible", "cosyvoice"] = "disabled"
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    voice: str = ""
+    response_format: Literal["mp3", "wav", "opus", "aac", "flac"] = "mp3"
+    sample_rate: int = Field(default=22050, ge=8000, le=192000)
+    timeout_seconds: float = Field(default=45.0, gt=0, le=180)
 
 
 class Settings(BaseSettings):
@@ -50,6 +64,7 @@ class Settings(BaseSettings):
     auto_create_tables: bool = True
 
     llm: LLMProviderConfig = LLMProviderConfig()
+    tts: TTSProviderConfig = TTSProviderConfig()
 
     @property
     def repos_dir(self) -> Path:

@@ -13,9 +13,16 @@ const TRACK_OPTIONS = ["大模型应用", "大模型算法", "大模型应用算
 interface PlanQuestion {
   id: number;
   stem: string;
+  display_stem: string;
   kind: string;
   answer: string | null;
   probes?: string[];
+  source: "bank" | "resume";
+  grounding?: {
+    kind: "experience" | "project" | "highlight";
+    label: string;
+    evidence: string;
+  } | null;
 }
 
 interface PlanResponse {
@@ -37,9 +44,9 @@ export function InterviewStartForm() {
   const [role, setRole] = useState("大模型应用开发实习生");
   const [company, setCompany] = useState("");
   const [track, setTrack] = useState("");
+  const [interviewLanguage, setInterviewLanguage] = useState<"zh-CN" | "en-US">("zh-CN");
   const [resumes, setResumes] = useState<ResumeListItem[]>([]);
   const [resumeId, setResumeId] = useState<number | null>(null);
-  const [usePlan, setUsePlan] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,26 +63,32 @@ export function InterviewStartForm() {
     setBusy(true);
     setError(null);
     try {
-      let questions: PlanQuestion[] | undefined;
-      let brief: string | undefined;
+      // F3 v2 始终使用题单：运行时才能确定性控制当前题、追问与结束边界。
+      const plan = await apiFetch<PlanResponse>("/api/interview/plan", {
+        method: "POST",
+        body: JSON.stringify({
+          company: company || undefined,
+          track: track || undefined,
+          size: 8,
+          resume_id: resumeId ?? undefined,
+          language: interviewLanguage,
+        }),
+      });
+      const questions = plan.questions.map((question) => ({
+        id: question.id,
+        stem: question.stem,
+        displayStem: question.display_stem,
+        kind: question.kind,
+        answer: question.answer,
+        probes: question.probes,
+        source: question.source,
+        ...(question.grounding ? { grounding: question.grounding } : {}),
+      }));
+      const brief = plan.brief || undefined;
       let highlights: string[] | undefined;
-      if (usePlan) {
-        // 组卷 v2：公司频率榜 ∪ 简历考点押题 → LLM 定卷 + 面经追问素材
-        const plan = await apiFetch<PlanResponse>("/api/interview/plan", {
-          method: "POST",
-          body: JSON.stringify({
-            company: company || undefined,
-            track: track || undefined,
-            size: 8,
-            resume_id: resumeId ?? undefined,
-          }),
-        });
-        questions = plan.questions;
-        brief = plan.brief || undefined;
-        if (resumeId !== null) {
-          const detail = await apiFetch<{ profile: { highlights?: string[] } }>(`/api/resumes/${resumeId}`);
-          highlights = detail.profile.highlights;
-        }
+      if (resumeId !== null) {
+        const detail = await apiFetch<{ profile: { highlights?: string[] } }>(`/api/resumes/${resumeId}`);
+        highlights = detail.profile.highlights;
       }
       const response = await fetch(agentsUrl("/sessions"), {
         method: "POST",
@@ -87,6 +100,7 @@ export function InterviewStartForm() {
             ...(company ? { company } : {}),
             ...(brief ? { brief } : {}),
             ...(highlights?.length ? { resumeHighlights: highlights } : {}),
+            interviewLanguage,
           },
           maxQuestionsPerPhase: 4,
           maxFollowUpDepth: 4,
@@ -114,7 +128,7 @@ export function InterviewStartForm() {
       <CardContent className="space-y-4 pt-1">
         <div className="space-y-1.5">
           <label className="text-xs text-ink-dim" htmlFor="resume">
-            简历（押题依据：结合简历考点与该公司面经组卷）
+            简历（个性化依据：先深挖经历/项目，再进入题库）
           </label>
           <select
             id="resume"
@@ -132,9 +146,23 @@ export function InterviewStartForm() {
           </select>
           {resumes.length === 0 && (
             <p className="text-xs text-ink-faint">
-              还没有简历：先到「简历工作台」上传 PDF，面试官才能针对简历押题。
+              还没有简历：先到「简历工作台」上传 PDF，面试官才能按真实经历和项目深挖。
             </p>
           )}
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs text-ink-dim" htmlFor="language">
+            面试语言
+          </label>
+          <select
+            id="language"
+            value={interviewLanguage}
+            onChange={(event) => setInterviewLanguage(event.target.value as "zh-CN" | "en-US")}
+            className="h-9 w-full rounded-md border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
+          >
+            <option value="zh-CN">中文（保留必要技术术语）</option>
+            <option value="en-US">English interview</option>
+          </select>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs text-ink-dim" htmlFor="role">
@@ -171,15 +199,9 @@ export function InterviewStartForm() {
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 text-xs text-ink-dim">
-          <input
-            type="checkbox"
-            checked={usePlan}
-            onChange={(event) => setUsePlan(event.target.checked)}
-            className="size-3.5 accent-[#4f6ef7]"
-          />
-          检索增强组卷（公司频率榜 × 简历押题 × 面经追问素材）
-        </label>
+        <p className="text-xs text-ink-dim">
+          每场自动使用证据化组卷（简历经历/项目深挖 × 公司高频题 × 面经追问素材）。
+        </p>
         {error && (
           <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             启动失败：{error}

@@ -1,0 +1,53 @@
+{
+  "evaluatedAt": "2026-09-01T11:29:29.826Z",
+  "sourceSessionId": "1aee86be-94a0-462e-8679-7abc924e971c",
+  "sourceLog": "data/sessions/1aee86be-94a0-462e-8679-7abc924e971c.jsonl",
+  "model": "deepseek-v4-flash-vision-exp",
+  "thinkingLevel": "medium",
+  "protocolVariant": "one_step_question_arg",
+  "protocolVersion": "f3.v2.one_step_question_arg",
+  "implementationSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+  "dataClass": "repository-authored synthetic fixtures",
+  "command": ".venv/Scripts/python.exe -u scripts/verify_f3_interview.py --drive --synthetic --agents-base http://127.0.0.1:23481 --drive-delay 105 --drive-max-minutes 40 --json",
+  "thresholds": {
+    "minimumDurationSeconds": 1800,
+    "minimumProbeChains": 8,
+    "decisionCoverage": 1.0,
+    "maximumProtocolErrors": 0,
+    "requiredFinalPhase": "closing"
+  },
+  "metrics": {
+    "durationSeconds": 1824.831,
+    "minutes": 30.4,
+    "probeChains": 9,
+    "probeTurns": 9,
+    "maximumFollowUpDepth": 1,
+    "decisionCount": 18,
+    "candidateTurnCount": 18,
+    "decisionCoverage": 1.0,
+    "forcedAdvanceCount": 0,
+    "protocolErrorCount": 0,
+    "decisionLatencyP50Ms": 1741,
+    "decisionLatencyP95Ms": 4753,
+    "totalTurnLatencyP50Ms": 1741,
+    "totalTurnLatencyP95Ms": 4754,
+    "mockThinkingRecordCount": 0,
+    "finalStatus": "closing",
+    "finalPhase": "closing"
+  },
+  "followUpRelevanceAudit": {
+    "artifact": "f3-followup-relevance-audit.json",
+    "sampleCount": 9,
+    "relevanceRate": 1.0,
+    "threshold": 0.8,
+    "passed": true
+  },
+  "passed": true,
+  "notes": [
+    "每个 target 先使用仓库内合成的含糊回答触发一次 probe，再使用人工 fixture 的完整回答触发 advance。",
+    "运行过程未读取本地题库、用户简历或既有用户会话；只有 repository-authored synthetic fixtures 被发送给模型。",
+    "18 个候选人轮次各有且只有一个 interview_decision；日志中无 protocol_error、无强制推进、无 mock 隐藏推理正文。",
+    "9 条 probe 已逐条人工审计并全部承接当前 target 与回答缺口；每条候选人可见回复只有一个主要问题。",
+    "严格按 30 分钟墙钟门槛验收，最终时长 30.4 分钟并正常进入 closing。"
+  ]
+}

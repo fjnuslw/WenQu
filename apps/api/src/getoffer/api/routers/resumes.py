@@ -34,10 +34,18 @@ class ResumeProjectOut(BaseModel):
     stack: list[str] = Field(default_factory=list, max_length=12)
 
 
+class ResumeExperienceOut(BaseModel):
+    organization: str
+    role: str | None = None
+    points: list[str] = Field(default_factory=list, max_length=8)
+    stack: list[str] = Field(default_factory=list, max_length=12)
+
+
 class ResumeProfile(BaseModel):
     candidate_name: str | None = None
     role_target: str | None = None
     tech_stack: list[str] = Field(default_factory=list, max_length=25)
+    experiences: list[ResumeExperienceOut] = Field(default_factory=list, max_length=8)
     projects: list[ResumeProjectOut] = Field(default_factory=list, max_length=8)
     highlights: list[str] = Field(default_factory=list, max_length=6)
     exam_tags: list[str] = Field(
@@ -55,6 +63,8 @@ RESUME_SYSTEM = f"""你是简历解析器。输入是一份求职简历的纯文
 - candidate_name：姓名（没有则空）
 - role_target：求职方向（如"大模型应用开发实习"）
 - tech_stack：全部技术栈关键词（框架/模型/工具/语言，保留原文写法）
+- experiences：实习/工作经历。organization=公司/组织；role=岗位；points=面试官会深挖的职责、实现、取舍和结果；
+  stack=该段经历用到的技术
 - projects：项目列表。name=项目名；points=面试官会拷打的要点（量化指标、架构决策、你的具体职责——3-6 条）；
   stack=该项目用到的技术
 - highlights：3-6 条"最值得面试官深挖的点"（一句话一条，具体不空泛）
@@ -108,6 +118,17 @@ async def upload_resume(
     row = Resume(file_path=str(stored), parsed=profile.public())
     session.add(row)
     await session.flush()
+    for experience in profile.experiences:
+        label = " · ".join(part for part in (experience.organization, experience.role) if part)
+        for point in experience.points:
+            session.add(
+                ResumeClaim(
+                    resume_id=row.id,
+                    kind="experience",
+                    claim_text=point,
+                    project_hint=label,
+                )
+            )
     for project in profile.projects:
         for point in project.points:
             session.add(
