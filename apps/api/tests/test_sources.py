@@ -2,8 +2,8 @@
 
 import pytest
 
-from getoffer.errors import LicenseViolation, NotFound
-from getoffer.ingest.sources import AllowedUse, SOURCES, get_source
+from getoffer.errors import NotFound
+from getoffer.ingest.sources import SOURCES, AllowedUse, get_source
 
 
 def test_sources_is_dict_keyed_by_slug() -> None:

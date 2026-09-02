@@ -16,6 +16,7 @@ dependencies = [
     "selectolax>=0.3.21",
     "pypdf>=5.0",
     "pgvector>=0.3.6",
+    "tree-sitter-language-pack>=1.15.8,<2",
     "meilisearch>=0.33",
     "arq>=0.26",
     "python-multipart>=0.0.20",

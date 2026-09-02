@@ -4,7 +4,9 @@ __pycache__/
 .venv/
 *.egg-info/
 .pytest_cache/
+.pytest-tmp*/
 .ruff_cache/
+.tmp/
 
 # Node
 node_modules/
@@ -19,6 +21,7 @@ logs/
 .env
 .env.*
 !apps/agents/.env.example
+!apps/api/.env.example
 *.local
 
 # 调研复用源码（各为独立 git 仓库，仅本地学习用，不随本项目提交）

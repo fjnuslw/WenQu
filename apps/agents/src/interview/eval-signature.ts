@@ -3,13 +3,15 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * 会改变 F3 决策质量、协议安全或运行时接线的源文件集合。
- * 实模/性能/长面基线都绑定该签名，避免实现已变而陈旧证据仍显示通过。
+ * F3 实模证据只绑定面试领域实现，不绑定承载多个产品模式的 server/session 壳。
+ *
+ * G1 曾仅为项目拷打增加 capability 字段，却让 F3 的真实模型基线失效；这说明
+ * 原签名把共享接线误当成了 F3 行为。今后会改变 F3 决策、协议或提示词的实现
+ * 必须落在 src/interview/ 内并进入本清单；共享壳由集成测试守护。
  */
+export const F3_IMPLEMENTATION_SCOPE_VERSION = "f3-dedicated-v2";
+
 export const F3_IMPLEMENTATION_FILES: readonly string[] = [
-  "src/types.ts",
-  "src/session.ts",
-  "src/server.ts",
   "src/interview/contracts.ts",
   "src/interview/state-machine.ts",
   "src/interview/policy.ts",

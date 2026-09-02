@@ -38,6 +38,13 @@ const grillSchema = z.object({
   projectId: z.number().int(),
   projectName: z.string().min(1),
   repoRoot: z.string().min(1),
+  capabilities: z
+    .object({
+      repoMap: z.boolean().optional(),
+      semanticSearch: z.boolean().optional(),
+      gitOwnership: z.boolean().optional(),
+    })
+    .optional(),
   briefing: z.object({
     overview: z.string(),
     stack_summary: z.string(),

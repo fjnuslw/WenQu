@@ -64,6 +64,12 @@ export interface GrillContext {
   projectName: string;
   /** 临时仓库根目录（路径监狱的锚点，agents 直接读共享 data 目录） */
   repoRoot: string;
+  /** API 备课产物决定的动态只读能力；未就绪的工具不会暴露给模型。 */
+  capabilities?: {
+    repoMap?: boolean;
+    semanticSearch?: boolean;
+    gitOwnership?: boolean;
+  };
   /** 备课简报（api 备课管道产出：overview/stack/modules 含拷打题） */
   briefing: {
     overview: string;

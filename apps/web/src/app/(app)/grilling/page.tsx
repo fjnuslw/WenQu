@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderOpen, Search, Swords, Upload } from "lucide-react";
+import { FolderGit2, FolderOpen, Search, Swords, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -29,6 +29,27 @@ interface GrillPrep {
   language_mix: Record<string, number>;
   briefing: { overview: string; stack_summary: string; modules: ModuleBriefing[] };
   claim_checks: { claim: string; status: string; evidence?: string | null; probe_question: string }[];
+  source: { kind: string };
+  capabilities: { repo_map: boolean; semantic_search: boolean; git_ownership: boolean };
+  repomap_summary: {
+    parsed_files: number;
+    supported_files: number;
+    coverage: number;
+    edge_count: number;
+    failure_count: number;
+  };
+  semantic_index: {
+    status: string;
+    model?: string | null;
+    chunk_count?: number;
+    vector_count?: number;
+  };
+  ownership_summary: {
+    available: boolean;
+    reason?: string;
+    history_scope?: { commits_analyzed?: number; shallow?: boolean; truncated?: boolean };
+    contributors?: { name: string; commits: number }[];
+  };
 }
 
 interface ResumeListItem {
@@ -47,6 +68,7 @@ interface ProjectCard {
   overview: string;
   in_projects_dir: boolean;
   created_at: string | null;
+  source_kind: string;
 }
 
 interface SessionItem {
@@ -68,8 +90,9 @@ const STATUS_BADGE: Record<string, { label: string; variant: "ok" | "warn" | "da
 
 export default function GrillingPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"dir" | "zip">("dir");
+  const [mode, setMode] = useState<"dir" | "zip" | "git">("dir");
   const [localPath, setLocalPath] = useState("");
+  const [gitUrl, setGitUrl] = useState("");
   const [name, setName] = useState("");
   const [resumes, setResumes] = useState<ResumeListItem[]>([]);
   const [resumeId, setResumeId] = useState<number | null>(null);
@@ -126,6 +149,34 @@ export default function GrillingPage() {
     try {
       const form = new FormData();
       form.append("local_path", trimmed);
+      if (name.trim()) form.append("name", name.trim());
+      if (resumeId !== null) form.append("resume_id", String(resumeId));
+      const response = await fetch("/api/grill/projects", { method: "POST", body: form });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(body?.error?.message ?? `备课失败: ${response.status}`);
+      }
+      const started = (await response.json()) as { project_id: number };
+      await pollPreparation(started.project_id);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setPrepping(false);
+    }
+  }
+
+  async function prepareGit() {
+    const trimmed = gitUrl.trim();
+    if (!trimmed) {
+      setError("先填写公共 HTTPS Git URL");
+      return;
+    }
+    setPrepping(true);
+    setError(null);
+    setPrep(null);
+    try {
+      const form = new FormData();
+      form.append("git_url", trimmed);
       if (name.trim()) form.append("name", name.trim());
       if (resumeId !== null) form.append("resume_id", String(resumeId));
       const response = await fetch("/api/grill/projects", { method: "POST", body: form });
@@ -255,6 +306,11 @@ export default function GrillingPage() {
             repoRoot: project.repo_root,
             briefing: project.briefing,
             claimChecks: project.claim_checks,
+            capabilities: {
+              repoMap: project.capabilities.repo_map,
+              semanticSearch: project.capabilities.semantic_search,
+              gitOwnership: project.capabilities.git_ownership,
+            },
           },
         }),
       });
@@ -298,7 +354,7 @@ export default function GrillingPage() {
     <div className="mx-auto max-w-4xl p-8">
       <PageHeader
         title="项目拷打"
-        description="本地部署形态：直接填项目目录路径（原位读码，零上传）或传 zip → AI 备课（模块/考点/拷打题 + 简历声明对照）→ 拷打官对照真实代码逐层深挖。"
+        description="本地目录、zip 或公共 Git URL → Tree-sitter repo map / 语义索引 / Git 归属 → AI 备课与简历声明对照 → 拷打官按需查证真实代码。"
       />
 
       <Card className="mb-5">
@@ -308,6 +364,7 @@ export default function GrillingPage() {
               [
                 { key: "dir", label: "本地目录（推荐）", icon: FolderOpen },
                 { key: "zip", label: "zip 上传", icon: Upload },
+                { key: "git", label: "Git URL", icon: FolderGit2 },
               ] as const
             ).map((option) => (
               <button
@@ -368,7 +425,7 @@ export default function GrillingPage() {
                 </div>
               </details>
             </div>
-          ) : (
+          ) : mode === "zip" ? (
             <div className="space-y-1.5">
               <label className="text-xs text-ink-dim">项目源码 zip（≤50MB，node_modules 自动过滤）</label>
               <input
@@ -385,6 +442,27 @@ export default function GrillingPage() {
                 <Button onClick={() => fileInputRef.current?.click()} disabled={prepping}>
                   <Upload className={prepping ? "size-4 animate-pulse" : "size-4"} />
                   {prepping ? "备课中…" : "选择 zip 并备课"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="text-xs text-ink-dim" htmlFor="git-url">
+                公共 HTTPS Git URL（不接受私有 token、SSH、本机或私网地址）
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="git-url"
+                  placeholder="https://github.com/owner/repository.git"
+                  value={gitUrl}
+                  onChange={(event) => setGitUrl(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !prepping && gitUrl.trim()) void prepareGit();
+                  }}
+                />
+                <Button onClick={() => void prepareGit()} disabled={prepping || !gitUrl.trim()}>
+                  <FolderGit2 className={prepping ? "size-4 animate-pulse" : "size-4"} />
+                  {prepping ? "获取中…" : "获取并备课"}
                 </Button>
               </div>
             </div>
@@ -435,7 +513,8 @@ export default function GrillingPage() {
                 />
               </div>
               <p className="text-xs leading-relaxed text-ink-faint">
-                读码 → 分批 LLM 备课 → {resumeId !== null ? "简历声明对照 → " : ""}完成。大仓库需要几分钟，进度实时更新，可以离开本页稍后在下面列表里回来。
+                获取仓库 → Tree-sitter / repo map → {" "}
+                {resumeId !== null ? "Git 归属与简历声明对照 → " : "Git 归属 → "}分批 LLM 备课。大仓库需要几分钟，可以离开本页稍后回来。
               </p>
             </div>
           )}
@@ -451,6 +530,17 @@ export default function GrillingPage() {
                 <span className="text-base font-semibold text-ink">{prep.name}</span>
                 <Badge variant="accent">{prep.file_count} 个文件</Badge>
                 {prep.resume_used && <Badge>已对照简历</Badge>}
+                <Badge variant={prep.capabilities.repo_map ? "ok" : "warn"}>
+                  Repo map {prep.repomap_summary.parsed_files}/{prep.repomap_summary.supported_files}
+                </Badge>
+                <Badge variant={prep.capabilities.semantic_search ? "ok" : "warn"}>
+                  {prep.capabilities.semantic_search ? "语义检索就绪" : "语义检索未配置"}
+                </Badge>
+                <Badge variant={prep.capabilities.git_ownership ? "ok" : "warn"}>
+                  {prep.capabilities.git_ownership
+                    ? `Git ${prep.ownership_summary.history_scope?.commits_analyzed ?? 0} commits`
+                    : "无 Git 历史"}
+                </Badge>
                 <span className="font-mono text-xs text-ink-faint">{prep.repo_root}</span>
                 <Button className="ml-auto" onClick={() => void startGrill(prep)} disabled={starting}>
                   <Swords className={starting ? "size-4 animate-pulse" : "size-4"} />
@@ -531,6 +621,7 @@ export default function GrillingPage() {
                 <CardContent className="p-4">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span className="text-sm font-semibold text-ink">{project.name}</span>
+                    <Badge>{project.source_kind === "git" ? "Git" : project.source_kind === "zip" ? "zip" : "本地"}</Badge>
                     {project.status === "ready" ? (
                       <span className="text-xs text-ink-dim">
                         {project.file_count} 文件 · {project.module_count} 模块

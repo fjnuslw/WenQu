@@ -29,7 +29,11 @@ class EvidenceRef(BaseModel):
 
     kind: Literal["quote", "code"] = Field(description="quote=候选人原话；code=对话中引用的代码位置")
     quote: str = Field(default="", max_length=300, description="原话摘录（kind=quote）")
-    file: str | None = Field(default=None, max_length=200, description="相对路径（kind=code，来自面试官的 引用）")
+    file: str | None = Field(
+        default=None,
+        max_length=200,
+        description="相对路径（kind=code，来自面试官的引用）",
+    )
     line: int | None = Field(default=None, ge=1)
 
 
@@ -56,7 +60,9 @@ class InterviewReport(BaseModel):
     review_suggestions: list[str] = Field(max_length=6, description="可执行的复习建议，注明涉及的知识标签")
 
 
-REPORT_SYSTEM = """你是大模型应用/Agent 岗位的资深面试评价官。输入是一场 AI 模拟面试/项目拷打的完整记录（含导演指令，可据此理解每个问题的考察意图，但不要评价导演指令本身）。
+REPORT_SYSTEM = """你是大模型应用/Agent 岗位的资深面试评价官。
+输入是一场 AI 模拟面试/项目拷打的完整记录（含导演指令，
+可据此理解每个问题的考察意图，但不要评价导演指令本身）。
 按以下维度打分（1-5 分）并给出具体证据：
 - 理解深度：是否讲到实现层与原理层，还是停留在名词罗列
 - 设计决策质量：是否说清"为什么这么选、代价是什么"
@@ -64,11 +70,15 @@ REPORT_SYSTEM = """你是大模型应用/Agent 岗位的资深面试评价官。
 - 诚实度：被追问到不会时是否坦诚，有没有编造
 
 证据链（重要）：
-- 每个维度的 comment 论断必须配 evidence：优先引用**候选人回答的原话**（kind=quote，逐字摘录关键句）；若面试官在提问/对质中引用了代码位置（形如 `路径:行号`），且该证据支撑你的论断，则输出 kind=code 的引用（file=相对路径原文，line=行号）。
+- 每个维度的 comment 论断必须配 evidence：优先引用**候选人回答的原话**
+  （kind=quote，逐字摘录关键句）；若面试官在提问/对质中引用了代码位置
+  （形如 `路径:行号`），且该证据支撑你的论断，则输出 kind=code 的引用
+  （file=相对路径原文，line=行号）。
 - 失分点（weaknesses）同样带 evidence：quote=暴露问题的原话；code=相关的代码位置（如有）。
 - 禁止臆造未出现的内容：evidence 必须能在记录中逐字找到。
 
-同时输出：亮点、失分点（供复习回流，每条从词表选 0-3 个 tags：{TAG_FAMILIES}）、复习建议（注明涉及的知识标签）。"""
+同时输出：亮点、失分点（供复习回流，每条从词表选 0-3 个 tags：
+{TAG_FAMILIES}）、复习建议（注明涉及的知识标签）。"""
 
 
 def _report_system() -> str:
@@ -173,10 +183,15 @@ async def generate_report(
     log_path = Path(settings.sessions_dir) / f"{session_id}.jsonl"
     loaded = _load_transcript(log_path)
     report = await gateway.complete_structured(
-        [{
-            "role": "user",
-            "content": f"面试配置：{json.dumps(loaded['config'], ensure_ascii=False)}\n\n面试记录：\n{loaded['transcript']}",
-        }],
+        [
+            {
+                "role": "user",
+                "content": (
+                    f"面试配置：{json.dumps(loaded['config'], ensure_ascii=False)}"
+                    f"\n\n面试记录：\n{loaded['transcript']}"
+                ),
+            }
+        ],
         InterviewReport,
         system=_report_system(),
         purpose="interview.report",

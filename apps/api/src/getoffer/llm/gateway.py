@@ -58,7 +58,14 @@ class LLMUsage:
         }
 
 
-def _usage_from_response(payload: dict[str, Any], *, provider: str, model: str, purpose: str, latency_ms: int) -> LLMUsage:
+def _usage_from_response(
+    payload: dict[str, Any],
+    *,
+    provider: str,
+    model: str,
+    purpose: str,
+    latency_ms: int,
+) -> LLMUsage:
     usage = payload.get("usage") or {}
     prompt_tokens = int(usage.get("prompt_tokens") or 0)
     completion_tokens = int(usage.get("completion_tokens") or 0)
@@ -138,7 +145,10 @@ class LLMGateway:
             choice = data["choices"][0]
             content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise UpstreamError("LLM 响应缺少 choices[0].message.content", details={"payload_keys": list(data)}) from exc
+            raise UpstreamError(
+                "LLM 响应缺少 choices[0].message.content",
+                details={"payload_keys": list(data)},
+            ) from exc
         if not isinstance(content, str) or not content.strip():
             # 思考型模型可能把输出预算全部消耗在 reasoning_content 上：显式暴露 finish_reason 便于定位
             message = choice.get("message") or {}
@@ -182,7 +192,10 @@ class LLMGateway:
         # 单次重试：把校验错误回传给模型修正。仍失败则显式抛错，不静默兜底。
         repair_messages = base_messages + [
             {"role": "assistant", "content": text},
-            {"role": "user", "content": f"上面的输出不符合 Schema，错误：{first_error}\n请重新输出正确的 JSON。"},
+            {
+                "role": "user",
+                "content": f"上面的输出不符合 Schema，错误：{first_error}\n请重新输出正确的 JSON。",
+            },
         ]
         retry_text = await self.complete(
             repair_messages, temperature=0.0, purpose=f"{purpose}:repair", max_tokens=max_tokens

@@ -1,215 +1,182 @@
-# 问渠 WenQu
+# 问渠 · WenQu
 
-> 问渠那得清如许，为有源头活水来。
+> 为大模型应用 / AI Agent 求职者打造的本地化面试备战工作台。
 
-**大模型应用 / AI Agent 方向的求职备战平台**——面经知识库、厂商题库、AI 考官模拟面试、**项目读码拷打**、间隔复习闭环，全部本地部署、数据留在你自己机器上。
+问渠不是“再做一个八股题库”，而是把 **面经、题库、简历、项目代码、模拟面试和复习** 串成一条可追溯的训练闭环：
 
-[![license](https://img.shields.io/badge/license-MIT-green)]() [![deploy](https://img.shields.io/badge/deploy-%E6%9C%AC%E5%9C%B0%E5%8D%95%E7%94%A8%E6%88%B7-purple)]() [![python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)]() [![node](https://img.shields.io/badge/node-22-blue)]()
+```text
+面经与题库 ──► 个性化组卷 ──► 模拟面试 ──► 项目读码拷打 ──► 证据链报告 ──► SM-2 复习
+      ▲                                                        │
+      └────────────────────── 掌握度与学习路径 ◄───────────────┘
+```
 
----
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![platform](https://img.shields.io/badge/platform-Windows%20local%20first-635bff)](docs/spec.md)
+[![python](https://img.shields.io/badge/python-%E2%89%A53.12-3776ab)](apps/api/pyproject.toml)
+[![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](apps/web/package.json)
+[![status](https://img.shields.io/badge/status-local%20MVP%20usable-f59e0b)](docs/spec.md)
 
-## 它解决什么问题
+## 先看四个关键看点
 
-求职大模型应用岗的真实痛点：八股题库烂大街，但**面试官真正拷打的是你简历上的项目**——「这个模块怎么实现的？为什么不用 X 方案？为什么没做 Y？」。市面上少有产品能读懂你的仓库再针对你提问。
-
-问渠补的就是这块：把「面经 → 题库 → 模拟面试 → 项目拷打 → 失分复习」串成一个闭环，且每一环都能追溯到原始证据。
-
-| 能力 | 说明 |
-|---|---|
-| 🗂️ **题库 22,812 题** | 11 个开源源（License 门禁）+ LeetCode Hot100；支持公司 × 岗位 × 频率榜三维筛选 |
-| 📰 **真实面经 503 条** | 公开页面合规采集 → LLM 结构化为「公司-岗位-轮次-问题树」 |
-| 🎯 **AI 考官模拟面试** | 简历考点 × 公司面经追问 × 频率榜 → LLM 定卷 → 题单驱动的状态机面试 |
-| ⚔️ **项目读码拷打**（核心差异位） | 上传项目目录 → AI 备课 → 拷打官**真读码**深挖，回答对照代码实时质证 |
-| 🔗 **证据链报告** | 每条评分结论挂**你的原话 + `文件:行号`**，点击即可回看现场 |
-| 🔁 **间隔复习闭环** | 失分点自动回流 SM-2 → 标签掌握度统计 → 一键导出 Anki |
-| 🗺️ **五条学习路径** | 109 个节点 / 141 条已核验资源 / 161 个资源锚点，可订阅、可勾选进度 |
-
-## 截图
-
-**项目拷打**：拷打官对照真实代码提问（右栏实时思考过程 + 项目文件树），点击 `文件:行号` 直接在侧栏定位到那一行。
-
-![拷打会话](docs/screenshots/grill-session.png)
-
-**证据链报告**：每个维度、每条失分点都挂候选人原话与代码位置，失分点可一键回流复习队列。
-
-![证据链报告](docs/screenshots/evidence-report.png)
-
-| | |
-|---|---|
-| ![工作台](docs/screenshots/dashboard.png) | ![题库](docs/screenshots/bank.png) |
-| **工作台**：真实统计 + 学习路径进度 | **题库**：厂商瓷片 × 岗位大类 × 问助手 |
-| ![面经](docs/screenshots/experiences.png) | ![项目备课](docs/screenshots/grilling.png) |
-| **面经**：按来源分类 + 问题树 | **项目拷打**：目录选择 → 异步备课 → 随时再开一场 |
-| ![复习队列](docs/screenshots/review.png) | ![JD 匹配](docs/screenshots/resume-jd.png) |
-| **复习队列**：SM-2 + 掌握度 + Anki 导出 | **简历工作台**：画像 + JD 匹配度（匹配/缺口/建议） |
-
----
-
-## 环境要求
-
-| 依赖 | 版本 | 说明 |
+| 看点 | 问渠怎么做 | 你最终拿到什么 |
 |---|---|---|
-| **Docker Desktop** | 任意近期版本 | 跑 PostgreSQL / MeiliSearch / Redis 三件套 |
-| **Node.js** | 22+ | web 与 agents 两个服务 |
-| **Python** | 3.12+ | api 服务 |
-| **uv** | 最新版 | Python 依赖管理，`setup.bat` 会自动安装 |
-| **DeepSeek API Key** | — | 全部 LLM 能力依赖它，[在此申请](https://platform.deepseek.com/) |
+| **针对你，而不是针对平均候选人** | 公司 × 岗位 × 频率榜与简历考点联合组卷，题单由 Harness 严格推进 | 一场有目标、有顺序、有追问上限的模拟面试 |
+| **项目拷打必须落到证据** | 项目备课、Tree-sitter repo map、只读读码、简历声明质证、`文件:行号` 锚点 | 面试官为什么追问、代码在哪里、回答缺了什么 |
+| **训练结果可以继续使用** | 评分报告提炼失分点，回流 SM-2，按标签统计掌握度并导出 Anki | 下一次复习不是重新开始，而是接着薄弱点练 |
+| **本地优先、边界清楚** | API / Agent / Web 三服务，数据与 API Key 留在本机；Agent 只有窄化的只读工具面 | 可审计、可复现、适合个人长期积累的工作台 |
 
-> **平台说明**：一键脚本（`setup.bat` / `start.bat` / `stop.bat` / `status.bat`）目前**仅支持 Windows**（PowerShell）。macOS / Linux 用户可按「手动部署」一节的步骤自行起服务。
+## 完整能力导览
+
+以下顺序就是一次完整使用路径。每个模块都有独立入口，也可以单独使用：
+
+| 模块 | 入口 | 演示重点 |
+|---|---|---|
+| **工作台** | `/` | 题库、面经、模拟面试、项目拷打、复习和学习路径的总览与今日行动 |
+| **题库** | `/bank` | 厂商 / 岗位 / 题型 / 标签筛选，支持算法题与手撕场景，题目保留来源与溯源信息 |
+| **面经** | `/experiences` | 公开来源结构化为公司 × 岗位 × 轮次 × 问题树，保留原始链接，支持公司频率校准 |
+| **模拟面试** | `/interview` | 简历考点 + 公司面经组卷，中文展示层、追问阶梯、状态机、评分报告和证据回流 |
+| **项目拷打** | `/grilling` | 本地目录 / zip / 公共 HTTPS Git；备课后按需读码，支持 repo map、语义检索和 Git 归属 |
+| **简历工作台** | `/resume` | 简历结构化、候选人画像、JD 匹配度、已覆盖能力 / 缺口 / 建议 |
+| **复习队列** | `/review` | 评分失分点进入 SM-2 队列，三键复习反馈，掌握度统计，一键导出 `.apkg` |
+| **学习路径** | `/paths` | 应用 / 算法 / 开发 / 手撕五条线，资源锚点复检，订阅与节点进度持久化 |
+
+## 项目拷打：当前版本的核心差异
+
+项目拷打不是把仓库全文塞进 Prompt，而是分层提供证据：
+
+```mermaid
+flowchart LR
+    A[本地目录 / zip / 公共 HTTPS Git] --> B[RepositorySource]
+    B --> C[RepoSnapshot]
+    C --> D[Tree-sitter 单遍分析]
+    D --> E[repo map<br/>定义 / 引用图 + PageRank]
+    D --> F[语法代码块<br/>路径 + 行号 + 稳定 hash]
+    F --> G[可选 embedding Provider]
+    G --> H[pgvector cosine 检索]
+    B --> I[Git 只读历史]
+    E --> J[备课简报]
+    H --> K[Agent 窄工具面]
+    I --> K
+    J --> K
+    K --> L[按需 read_file 核证]
+```
+
+Agent 默认只看到三个基础工具：`list_files`、`read_file`、`search_code`。当项目能力清单确认可用时，才动态注册：
+
+- `get_repo_map`：先找架构中心与关键符号；
+- `semantic_search`：不知道函数名时按职责定位代码（未配置 Provider 时不会出现）；
+- `get_git_ownership`：只在需要核实候选人贡献时查看历史，不把提交量直接当能力结论。
+
+当前 G1 v2 的代码模块已经收口，真实 embedding Provider 发布验收仍单独保留为环境门，详见 [IMP-G1-001](docs/improvement-specs/IMP-G1-001-repository-intelligence-v2.md)。
+
+## 验收基线
+
+最近一次真实运行结果（工作树包含在证据中）：
+
+- Tree-sitter：当前仓库 232 个快照文件，177/177 个受支持源码文件解析成功，370 个语法代码块，repo map 3,004 条引用边；
+- pgvector：真实 PostgreSQL/pgvector 写入 370 个真实代码块并完成 cosine 查询，目标实现文件进入 Top-5；当前 Provider=disabled，因此不把 fixture 向量宣称为语义质量；
+- Git：公共 `https://github.com/pallets/itsdangerous.git` 全流程通过，15/15 受支持源码解析，200 条提交历史归属分析；
+- 回归：API 121 tests + ruff，Agents 29 tests + typecheck，Web 5 tests + typecheck + production build；三项服务健康检查均为 200。
+
+详细证据：[G1 验收基线](apps/api/evals/g1-repository-intelligence-baseline.json) · [总规范](docs/spec.md) · [改进 Spec 索引](docs/improvement-specs/README.md)
 
 ## 快速开始
 
+### 环境要求
+
+| 依赖 | 版本 | 用途 |
+|---|---|---|
+| Docker Desktop | 任意近期版本 | PostgreSQL / pgvector、Meilisearch、Redis |
+| Node.js | 22+ | Web 与 Agents |
+| Python | 3.12+ | API |
+| uv | 最新版 | Python 依赖管理 |
+| DeepSeek API Key | — | 面试、备课、评分等 LLM 能力 |
+
+### Windows 一键启动
+
 ```bat
-1. git clone https://github.com/fjnuslw/WenQu.git
-   cd WenQu
+git clone https://github.com/fjnuslw/WenQu.git
+cd WenQu
 
-2. 双击 setup.bat
-   :: 自动检查工具链、安装依赖、生成 .env 样例
+:: 双击或执行：安装工具链、依赖与 .env 样例
+setup.bat
 
-3. 填入你的 API Key（两个文件都要填）
-   apps/api/.env      → GETOFFER_LLM__API_KEY=sk-xxxxxx
-   apps/agents/.env   → DEEPSEEK_API_KEY=sk-xxxxxx
-
-4. 双击 start.bat
-   :: 拉起 docker 基础设施 + 三个服务，并等待健康检查就绪
-
-5. 打开 http://127.0.0.1:23482
+:: 分别填写 apps/api/.env 与 apps/agents/.env 中的 API Key
+:: 然后启动 Docker 基础设施与三项服务
+start.bat
 ```
 
-首次启动会初始化数据库表结构（约 10 秒）。**题库与面经需要你自己导入**，仓库不含任何数据快照——导入方式见「数据从哪来」一节。
+打开 <http://127.0.0.1:23482>。
+
+停止、状态检查和日志：
+
+```bat
+stop.bat
+status.bat
+```
 
 ### 手动部署（macOS / Linux）
 
 ```bash
-# 1. 基础设施
 docker compose up -d
 
-# 2. api
-cd apps/api && uv sync && uv run uvicorn getoffer.api.main:create_app --factory --port 23480
+cd apps/api && uv sync
+uv run uvicorn getoffer.api.main:create_app --factory --port 23480
 
-# 3. agents
-cd apps/agents && npm install && npm run dev
-
-# 4. web
-cd apps/web && npm install && npm run dev
+cd ../agents && npm install && npm run dev
+cd ../web && npm install && npm run dev
 ```
 
-## 配置说明
+## 配置与数据边界
 
-配置集中在两个 `.env`（由 `setup.bat` 从 `.env.example` 生成）。**绝大多数保持默认即可**，必填的只有 API Key。
+配置分为 API 与 Agents 两个 `.env`，模板见 [apps/api/.env.example](apps/api/.env.example) 和 [apps/agents/.env.example](apps/agents/.env.example)。`.env`、数据库和本地导入数据不会进入 Git。
 
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `GETOFFER_LLM__API_KEY` | 空 | **必填**。留空时服务照常启动，但所有 LLM 功能抛 `NotConfigured` |
-| `DEEPSEEK_API_KEY` | 空 | **必填**（agents 侧）。与上者填同一个 key 即可 |
-| `GETOFFER_LLM__MODEL` | `deepseek-v4-flash-vision-exp` | 换模型改这里（需 OpenAI 兼容接口） |
-| `GETOFFER_DATABASE_URL` | `...localhost:24432/getoffer` | 改端口或换库时调整 |
-| `GETOFFER_TTS__PROVIDER` | `disabled` | 语音朗读默认关闭，配置后启用 |
-| `GETOFFER_GIT_PROXY` / `GETOFFER_COLLECT_PROXY` | 空 | 网络受限环境可填代理 |
-
-## 日常使用
-
-| 操作 | 命令 / 动作 |
+| 配置 | 默认 / 说明 |
 |---|---|
-| 启动 | 双击 `start.bat` |
-| 停止 | 双击 `stop.bat` |
-| 查看状态 | 双击 `status.bat`（三服务健康检查 + 端口占用） |
-| 重启 | `stop.bat` → `start.bat` |
-| 看日志 | `logs/api.err.log`、`logs/web.out.log`、`logs/agents.err.log` |
+| `GETOFFER_LLM__API_KEY` | API 侧 LLM Key；为空时服务仍启动，但 LLM 功能显式返回未配置 |
+| `DEEPSEEK_API_KEY` | Agents 侧 Key，与 API 侧可使用同一 Key |
+| `GETOFFER_TTS__PROVIDER` | `disabled`（默认）或已配置的语音 Provider |
+| `GETOFFER_EMBEDDING__PROVIDER` | `disabled`（默认）或 `openai_compatible`；与聊天 LLM 完全分离 |
+| `GETOFFER_GIT_PROXY` / `GETOFFER_COLLECT_PROXY` | 网络受限时填写代理 |
 
-**改了前端代码记得重新构建**——web 走生产模式（`next build` + `next start`），改完源码不重新构建，页面不会变。`start.bat` 会自动构建，但如果你只想单独重建：
+题库与面经需要自行导入：
 
 ```bat
-cd apps/web && npx next build
+cd apps/api
+uv run python scripts/import_source.py --all
+uv run python scripts/backfill_company_freq.py
 ```
 
-## 常见问题
+导入器带幂等设计，License 门禁拒绝 GPL / AGPL / NC 内容进入库内。第三方内容的使用合规责任由使用者承担。
 
-| 症状 | 原因与处理 |
-|---|---|
-| `start.bat` 报端口被占用 | 脚本会自动清理本项目端口上的遗留进程；若仍失败，手动 `stop.bat` 后再启，或检查是否有其他程序占用 23480-23482 / 24432 / 27700 / 26379 |
-| Docker 相关报错 | 确认 Docker Desktop 已启动并处于 running 状态，`docker compose ps` 应看到 3 个容器 |
-| 服务起来了但面试 / 题库问答报 `NotConfigured` | API Key 没填或填错，检查两个 `.env` 并重启 |
-| 改了前端代码页面没变 | 生产模式需重新构建，见「日常使用」 |
-| `python` 版本不对 | 需 3.12+；`setup.bat` 用 uv 装依赖，会按 `pyproject.toml` 选版本 |
-| 数据库连不上 | 先确认 docker 三件套在跑：`docker compose ps` |
-| 想彻底重来 | `stop.bat` → 删除 docker 数据卷 → `start.bat`（会重建空库，再重新导入数据） |
+## 工程结构
 
-## 数据从哪来
-
-**仓库不含任何数据快照**，`data/` 与数据库都不进 Git。所有数据由你自己导入，导入器带幂等设计，可反复重跑：
-
-```bat
-:: 题库：从 11 个开源源导入（License 门禁自动生效）
-cd apps/api && uv run python scripts/import_source.py --all
-
-:: 面经：见 docs/spec.md §10 的采集通道说明
-:: 运维脚本（按需运行）
-uv run python scripts/backfill_company_freq.py   :: 用面经校准公司频率榜
-uv run python scripts/recheck_pins.py            :: 复检学习路径的 161 个资源锚点
-uv run python scripts/verify_f3_interview.py     :: 统计模拟面试的追问链产出
-```
-
-**License 门禁是硬性的**：GPL / AGPL / NC 协议的内容**不入库**，只作站外引用；无 License 的源仅提取题干、答案自写。当前库内零 GPL 内容。
-
-## 项目结构
-
-```
+```text
 apps/
-  api/      FastAPI：知识管道（采集/抽取/检索）、组卷、报告、复习、统计
-  agents/   Node + pi 运行时：面试 / 拷打 / 答题三个 agent
-  web/      Next.js 16：全部前端页面
-docs/       规格说明书（spec.md）与截图
-research/   竞品调研、数据渠道、agent harness 技术调研
-scripts/    一键启停脚本（Windows PowerShell）
+  api/      FastAPI：采集、解析、组卷、报告、复习、统计、仓库智能层
+  agents/   Node + pi：mock / grill / answer 三类 Agent 与 SSE 会话
+  web/      Next.js：工作台、题库、面经、面试、拷打、简历、复习、路径
+docs/       规格、改进 Spec、验收基线与演示文档
+research/   竞品、数据渠道、Agent Harness 与仓库理解调研
+scripts/    Windows 一键启停与状态脚本
 ```
 
-## 架构
-
-```
-        ┌────────────── 浏览器（Next.js 16，暗色优先）──────────────┐
-        │  题库/面经/面试/拷打/简历/复习 —— 同源代理（SSE 逐块流式）    │
-        └──────┬─────────────────────────────┬────────────────────┘
-        REST /api│                        SSE /agents│
-   ┌────────────┴───────────┐      ┌───────────────┴────────────────┐
-   │ apps/api · FastAPI      │      │ apps/agents · Node + pi 运行时   │
-   │ 知识管道（采集/抽取/检索）│ 内部  │ 面试 agent（状态机 + 追问阶梯）   │
-   │ 组卷/报告/复习/统计      │◄────►│ 拷打 agent（只读工具面 + 路径监狱）│
-   └──┬──────┬──────┬───────┘      │ 答题 agent（web_search + 思考流） │
-   Postgres  Meili  Redis           └───────────────┬────────────────┘
-   +pgvector (CJK) (arq)                    OpenAI 兼容│
-                                              ┌───────┴────────┐
-                                              │  DeepSeek API   │
-                                              └────────────────┘
-```
-
-技术选型与工程原则（禁正则硬编码解析、禁静默 fallback、append-only JSONL 会话、类型化错误族、幂等管道）见 **[docs/spec.md](docs/spec.md)**；竞品与数据渠道调研见 **[research/](research/)**。
+设计原则：模块边界清晰、禁止静默 fallback、类型化错误、append-only 会话日志、幂等管道、所有代码证据保留路径与行号。实现细节见 [docs/spec.md](docs/spec.md)。
 
 ## Roadmap
 
-- [x] K1 题库与面经知识核心（22,812 题 + 合规采集管道）
-- [x] I1 模拟面试循环（简历押题组卷 → 评分报告 → 失分回流）
-- [x] G1 项目拷打 v1（备课 / 只读工具面 / 证据链报告）
-- [x] L1 学习闭环（SM-2 / 掌握度 / Anki / JD 匹配）
-- [x] 面经 → 公司频率榜事实校准（可追溯到具体面经条目）
-- [x] 语音朗读（TTS，默认关闭可配置启用）
-- [x] F7 学习路径（五条线 · 进度订阅 · 锚点复检自动化）
-- [ ] G1 v2：tree-sitter repo map / pgvector 语义检索 / git 归属分析
-- [ ] 长面验收实测（30 分钟 ≥8 条追问链，脚本已就绪待跑）
+- [x] K1 知识核心：题库、面经、标签、公司频率榜与合规导入
+- [x] I1 模拟面试：简历押题组卷、追问阶梯、评分报告、失分回流
+- [x] G1 项目拷打 v1：备课、只读工具、代码证据链报告
+- [x] L1 学习闭环：SM-2、掌握度、Anki、JD 匹配
+- [x] F7 学习路径：五条线、资源锚点、订阅与进度
+- [ ] G1 v2 发布门：配置真实 embedding Provider 后完成自然语言 Top-5 质量验收
+- [ ] README v2 演示图：以当前界面重新实测，统一新设计并对姓名、联系方式、文件名等敏感信息脱敏
 
 ## 复用与致谢
 
-Agent 运行时复用 [pi-agent-core / pi-ai](https://github.com/earendil-works/pi)（MIT）；架构思想参考 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（插件化）、[deepwiki-open](https://github.com/AsyncFuncAI/deepwiki-open)（repo 理解）、[The-Interview-Mentor](https://github.com/ps06756/The-Interview-Mentor)（阶段机 + rubric）、aider repomap（Apache-2.0）。题库源遵守各自 License，详见 spec §10。
-
----
+Agent 运行时复用 [pi-agent-core / pi-ai](https://github.com/earendil-works/pi)（MIT）；设计思想参考 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)、[deepwiki-open](https://github.com/AsyncFuncAI/deepwiki-open)、[The-Interview-Mentor](https://github.com/ps06756/The-Interview-Mentor) 与 aider repomap。题库来源遵守各自 License。
 
 ## License 与免责声明
 
-代码使用 **MIT**，详见 [LICENSE](LICENSE)。
-
-使用本项目前请知悉：
-
-- **本项目为个人学习用途设计，形态是本地单用户**，没有多租户、认证与限流，请勿直接部署为公开服务。
-- **数据需自行导入**：仓库不分发任何第三方内容。项目自带的采集器在 `robots` 与公开范围内低频工作，但你导入的数据，其合规责任由你承担；面经类内容仅供个人学习，对外分发前请自行评估版权与平台条款风险。
-- **API Key 是你自己的**：`.env` 已被 Git 忽略，请勿将填好 Key 的 `.env` 提交或分享。
-- **AI 输出不保证准确**：面试评分、押题、拷打结论均由 LLM 生成，请批判性看待，重要决策不要依赖单一模型输出。
+代码使用 [MIT License](LICENSE)。本项目是个人学习用途的本地单用户 MVP，没有多租户、认证与限流，请勿直接部署为公开服务。AI 面试、评分、押题和拷打结果仅供训练参考；重要决策不要依赖单一模型输出。

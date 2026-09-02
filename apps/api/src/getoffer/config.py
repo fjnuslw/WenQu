@@ -42,6 +42,18 @@ class TTSProviderConfig(BaseModel):
     timeout_seconds: float = Field(default=45.0, gt=0, le=180)
 
 
+class EmbeddingProviderConfig(BaseModel):
+    """代码语义索引的独立 Provider；不隐式复用聊天模型配置。"""
+
+    provider: Literal["disabled", "openai_compatible"] = "disabled"
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    dimension: int = Field(default=0, ge=0, le=16384)
+    batch_size: int = Field(default=32, ge=1, le=128)
+    timeout_seconds: float = Field(default=45.0, gt=0, le=180)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="GETOFFER_",
@@ -65,6 +77,7 @@ class Settings(BaseSettings):
 
     llm: LLMProviderConfig = LLMProviderConfig()
     tts: TTSProviderConfig = TTSProviderConfig()
+    embedding: EmbeddingProviderConfig = EmbeddingProviderConfig()
 
     @property
     def repos_dir(self) -> Path:

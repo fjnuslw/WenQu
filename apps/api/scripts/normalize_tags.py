@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sqlalchemy import delete, select, update  # noqa: E402
+from sqlalchemy import delete, select  # noqa: E402
 
 from getoffer.config import load_settings  # noqa: E402
 from getoffer.db import make_engine, make_sessionmaker  # noqa: E402
@@ -39,7 +39,11 @@ async def main() -> None:
                 print(f"rename: {old_name} -> {canonical}")
                 continue
             # 有同名词：把引用迁到 target，再删除旧标签
-            ids = (await session.scalars(select(Question.id).where(Question.tags.any(Tag.id == tag.id)))).all()
+            ids = (
+                await session.scalars(
+                    select(Question.id).where(Question.tags.any(Tag.id == tag.id))
+                )
+            ).all()
             for question_id in ids:
                 question = await session.get(Question, question_id)
                 question.tags = [t for t in question.tags if t.id != tag.id]
@@ -52,7 +56,8 @@ async def main() -> None:
         await session.commit()
 
         total_tags = (await session.scalars(select(Tag))).all()
-        print(f"done. renamed={renamed} merged={merged} tags_now={len(total_tags)}: {[t.name for t in total_tags]}")
+        names = [tag.name for tag in total_tags]
+        print(f"done. renamed={renamed} merged={merged} tags_now={len(total_tags)}: {names}")
     await engine.dispose()
 
 

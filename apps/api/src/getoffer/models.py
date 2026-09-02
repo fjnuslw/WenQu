@@ -255,6 +255,26 @@ class RepoArtifact(Base, IntPkMixin):
     )
 
 
+class RepoChunk(Base, IntPkMixin):
+    """Tree-sitter/cAST 风格代码块；Embedding.ref_id 以 kind=repo_chunk 指向这里。"""
+
+    __tablename__ = "repo_chunks"
+    __table_args__ = (
+        Index("ix_repo_chunks_project_path", "project_id", "path"),
+        UniqueConstraint("project_id", "path", "start_line", "content_hash"),
+    )
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    language: Mapped[str] = mapped_column(String(32), nullable=False)
+    start_line: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_line: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    symbols: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+
+
 class Suspicion(Base, IntPkMixin, TimestampMixin):
     """简历声明 ↔ 代码证据映射产出的注水疑点（spec F4）。"""
 

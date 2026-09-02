@@ -16,8 +16,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from getoffer.config import load_settings  # noqa: E402
-from getoffer.ingest.sources import AllowedUse, SOURCES  # noqa: E402
+from getoffer.ingest.sources import SOURCES, AllowedUse  # noqa: E402
 
 
 def run_source(client: httpx.Client, base_url: str, slug: str, batch: int, max_batches: int) -> bool:
@@ -38,7 +37,12 @@ def run_source(client: httpx.Client, base_url: str, slug: str, batch: int, max_b
         try:
             payload = response.json()
         except ValueError:
-            payload = {"error": {"message": response.text[:200] or "(empty body)", "status": response.status_code}}
+            payload = {
+                "error": {
+                    "message": response.text[:200] or "(empty body)",
+                    "status": response.status_code,
+                }
+            }
         if response.status_code != 200 or "error" in payload:
             print(f"  [{slug}] batch {batch_no}: {payload}")
             consecutive_errors += 1
@@ -69,7 +73,6 @@ def main() -> None:
     parser.add_argument("--max-batches", type=int, default=200)
     args = parser.parse_args()
 
-    settings = load_settings()
     base_url = "http://127.0.0.1:23480"
     slugs = (
         [spec.slug for spec in SOURCES.values() if spec.allowed_use is not AllowedUse.REFERENCE_ONLY]

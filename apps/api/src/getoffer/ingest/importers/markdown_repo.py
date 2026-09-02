@@ -24,7 +24,7 @@ from getoffer.ingest.qa_extract import extract_from_sections
 from getoffer.ingest.sources import AllowedUse, SourceSpec, get_source
 from getoffer.llm.gateway import LLMGateway
 from getoffer.models import Question, Source, SourceFile, Tag
-from getoffer.search.meili import MeiliIndexer, QUESTIONS_INDEX
+from getoffer.search.meili import QUESTIONS_INDEX, MeiliIndexer
 
 MIN_SECTION_CHARS = 60  # 少于该长度的小节不进抽取，避免标题党碎片
 
@@ -93,7 +93,11 @@ def sections_from_file(path: Path) -> list[Section]:
         raw = path.read_text(encoding="utf-8", errors="replace")
     tokens = markdown_ast.parse_markdown(raw)
     _, roots = markdown_ast.split_sections(tokens)
-    return [section for section in markdown_ast.flatten_sections(roots) if len(section.text) >= MIN_SECTION_CHARS]
+    return [
+        section
+        for section in markdown_ast.flatten_sections(roots)
+        if len(section.text) >= MIN_SECTION_CHARS
+    ]
 
 
 async def _get_or_create_tag(session: AsyncSession, name: str) -> Tag:

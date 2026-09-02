@@ -6,6 +6,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from getoffer.config import Settings
+from getoffer.grill.embeddings import EmbeddingGateway
 from getoffer.llm.gateway import LLMGateway
 from getoffer.search.meili import MeiliIndexer
 from getoffer.voice import VoiceGateway
@@ -35,3 +36,7 @@ def get_settings(request: Request) -> Settings:
 
 def get_voice_gateway(request: Request) -> VoiceGateway:
     return request.app.state.voice_gateway
+
+
+def get_embedding_gateway(request: Request) -> EmbeddingGateway:
+    return request.app.state.embedding_gateway

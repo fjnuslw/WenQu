@@ -6,7 +6,14 @@
   "thinkingLevel": "medium",
   "protocolVariant": "one_step_question_arg",
   "protocolVersion": "f3.v2.one_step_question_arg",
-  "implementationSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+  "implementationSha256": "5aada10a51ebb7298e6b57e2dbdf9fa59705442757e06d5550a29b44bd0c8e9c",
+  "implementationScopeVersion": "f3-dedicated-v2",
+  "signatureMigration": {
+    "migratedOn": "2026-09-02",
+    "previousSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+    "reason": "G1-only capability wiring changed shared server/session/type files but did not change any F3 domain implementation file.",
+    "metricsRerun": false
+  },
   "dataClass": "repository-authored synthetic fixtures",
   "command": ".venv/Scripts/python.exe -u scripts/verify_f3_interview.py --drive --synthetic --agents-base http://127.0.0.1:23481 --drive-delay 105 --drive-max-minutes 40 --json",
   "thresholds": {

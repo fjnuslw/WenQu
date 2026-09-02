@@ -1,12 +1,11 @@
 """G1 项目拷打：备课流水线（research/06 §3）。
 
-zip 上传 → 解压（Zip Slip 防护）→ 噪声过滤 → 文件树+重要度 → LLM 分批备课
+本地目录 / zip / 公共 HTTPS Git → 噪声过滤 → 文件树+重要度 → LLM 分批备课
 （模块/职责/技术点/三类拷打题）→（可选）简历声明对照 → 注水疑点清单。
 产物落 Project + RepoArtifact（分步 checkpoint，spec §7）。
 """
 
-import io
-import zipfile
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -17,6 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from getoffer.config import Settings
 from getoffer.errors import ValidationFailed
+from getoffer.grill.chunks import normalize_chunks
+from getoffer.grill.embeddings import EmbeddingGateway
+from getoffer.grill.ownership import analyze_git_ownership
+from getoffer.grill.repomap import build_repo_map
+from getoffer.grill.retrieval import replace_project_chunks
+from getoffer.grill.source import acquire_repository, enumerate_repository_files
+from getoffer.grill.syntax import analyze_files
 from getoffer.llm.gateway import LLMGateway
 from getoffer.models import Project, RepoArtifact, Resume, ResumeClaim
 
@@ -24,7 +30,8 @@ from getoffer.models import Project, RepoArtifact, Resume, ResumeClaim
 EXCLUDE_DIRS = {
     ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "__pycache__",
     "dist", "build", "out", "target", ".next", ".turbo", "coverage",
-    ".idea", ".vscode", "assets", "img", "images", "fonts",
+    ".idea", ".vscode", ".tmp", ".ruff_cache", ".workbuddy", ".zcode",
+    "assets", "img", "images", "fonts", "logs",
     # 小程序/跨端生态的依赖与构建产物（weixin 项目实测 49,700 文件教训）
     "miniprogram_npm", "uni_modules", "unpackage", "taro", "vendor", "Pods",
 }
@@ -39,9 +46,18 @@ TEXT_SUFFIXES = {
     ".go", ".rs", ".java", ".kt", ".c", ".h", ".cpp", ".hpp", ".cs", ".rb", ".php", ".swift",
     "Dockerfile", ".dockerignore", ".gitignore", ".env.example",
 }
+CODE_SUFFIXES = {
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
+    ".sql", ".sh", ".ps1", ".bat", ".html", ".css", ".scss", ".vue", ".svelte",
+    ".wxml", ".wxss", ".go", ".rs", ".java", ".kt", ".c", ".h", ".cpp", ".hpp",
+    ".cs", ".rb", ".php", ".swift",
+}
 MAX_FILE_BYTES = 256 * 1024  # 单文件读入上限（大文件多为生成物/数据）
 MAX_FILES = 400
-MAX_TOTAL_CHARS = 400_000  # 备课输入预算（分批后仍然封顶）
+# Repository Intelligence must see substantially more than the LLM briefing.  The latter
+# already has its own 6 × 24k prompt cap in run_briefing; reusing that tiny budget here made
+# later files invisible to Tree-sitter and semantic retrieval.
+MAX_TOTAL_CHARS = 8_000_000
 
 
 @dataclass
@@ -72,40 +88,12 @@ class RepoSnapshot:
         return dict(sorted(mix.items(), key=lambda kv: -kv[1])[:8])
 
 
-def extract_zip_safely(data: bytes, target: Path) -> tuple[int, list[str]]:
-    """解压 + Zip Slip 防护 + 噪声过滤（解压阶段就不落噪声文件）。返回 (落盘文件数, 跳过目录)。"""
-    target.mkdir(parents=True, exist_ok=True)
-    skipped: set[str] = set()
-    written = 0
-    try:
-        archive = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile as exc:
-        raise ValidationFailed(f"zip 包损坏: {exc}") from exc
-    for info in archive.infolist():
-        if info.is_dir():
-            continue
-        name = info.filename
-        # 绝对路径 / 盘符 / .. 一律拒绝（Zip Slip）
-        pure = PurePosixPath(name.replace("\\", "/"))
-        if pure.is_absolute() or ".." in pure.parts or name.startswith(("/", "\\")) or ":" in name.split("/")[0]:
-            raise ValidationFailed(f"zip 内含非法路径（疑似 Zip Slip）: {name}")
-        parts = pure.parts
-        if any(part in EXCLUDE_DIRS for part in parts[:-1]):
-            skipped.add(parts[next(i for i, p in enumerate(parts) if p in EXCLUDE_DIRS)])
-            continue
-        dest = target.joinpath(*parts)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(archive.read(info))
-        written += 1
-    return written, sorted(skipped)
-
-
 def collect_files(root: Path) -> RepoSnapshot:
-    """收集文本文件并按重要度排序：README > 入口/配置 > 更大的源码文件。"""
+    """收集文本文件；根 README 提供总览，随后源码优先，防止文档吃光解析预算。"""
     snapshot = RepoSnapshot()
-    all_paths = [p for p in root.rglob("*") if p.is_file()]
+    all_paths = enumerate_repository_files(root, excluded_dirs=EXCLUDE_DIRS)
     snapshot.total_files_on_disk = len(all_paths)
-    candidates: list[tuple[int, Path]] = []
+    candidates: list[tuple[int, int, Path]] = []
     for path in all_paths:
         rel = path.relative_to(root).as_posix()
         parts = PurePosixPath(rel).parts
@@ -113,31 +101,54 @@ def collect_files(root: Path) -> RepoSnapshot:
             continue
         suffix = path.suffix.lower()
         base = path.name.lower()
-        is_text = suffix in TEXT_SUFFIXES or base in {"dockerfile", "makefile", "license"} or base.startswith(".env")
+        is_text = (
+            suffix in TEXT_SUFFIXES
+            or base in {"dockerfile", "makefile", "license"}
+            or base.startswith("readme")
+            or base.startswith(".env")
+        )
         if not is_text:
             continue
         if path.stat().st_size > MAX_FILE_BYTES:
             continue
         name = path.name.lower()
-        if name == "readme.md" or name.startswith("readme"):
+        is_readme = name == "readme.md" or name.startswith("readme")
+        if is_readme:
             importance = 1000
-        elif name in {"main.py", "app.py", "server.ts", "index.ts", "main.ts", "__init__.py", "package.json", "pyproject.toml"} or "main" in name:
+        elif (
+            name
+            in {
+                "main.py", "app.py", "server.ts", "index.ts", "main.ts", "__init__.py",
+                "package.json", "pyproject.toml",
+            }
+            or "main" in name
+        ):
             importance = 800
         elif parts[0] in {"src", "apps", "lib", "server", "api"} :
             importance = 500 + min(path.stat().st_size // 2000, 300)
         else:
             importance = 100 + min(path.stat().st_size // 2000, 300)
-        candidates.append((importance, path))
-    candidates.sort(key=lambda pair: (-pair[0], pair[1].as_posix()))
+        # 只有仓库根 README 抢在源码前；嵌套文档统一后置。旧实现让多个 README
+        # 先耗尽 MAX_TOTAL_CHARS，真实仓库可能一个源码都进不了 Tree-sitter。
+        if is_readme and len(parts) == 1:
+            group = 0
+        elif suffix in CODE_SUFFIXES:
+            group = 1
+        elif suffix in DOC_SUFFIXES:
+            group = 3
+        else:
+            group = 2
+        candidates.append((group, importance, path))
+    candidates.sort(key=lambda item: (item[0], -item[1], item[2].as_posix()))
     total_chars = 0
-    for importance, path in candidates:
+    for _group, importance, path in candidates:
         if len(snapshot.files) >= MAX_FILES:
             break
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if suffix in DOC_SUFFIXES and len(text) > DOC_FILE_CAP:
+        if path.suffix.lower() in DOC_SUFFIXES and len(text) > DOC_FILE_CAP:
             text = text[:DOC_FILE_CAP]  # 文档截头：预算优先源码（weixin 教训）
         if total_chars + len(text) > MAX_TOTAL_CHARS:
             text = text[: max(0, MAX_TOTAL_CHARS - total_chars)]
@@ -174,7 +185,9 @@ class RepoBriefing(BaseModel):
     not_understood: list[str] = Field(default_factory=list, max_length=8)
 
 
-BRIEFING_SYSTEM = """你是资深面试官，正在给候选人的代码仓库"备课"——真实面试的项目拷打重心是**架构与设计决策**（模块划分/选型理由/数据流/扩展与失败场景），函数级细节只作验证候选人的证据，不是考点本身。
+BRIEFING_SYSTEM = """你是资深面试官，正在给候选人的代码仓库"备课"。
+真实面试的项目拷打重心是**架构与设计决策**（模块划分/选型理由/数据流/扩展与失败场景），
+函数级细节只作验证候选人的证据，不是考点本身。
 输入是仓库的文件树（含行数）与若干文件内容（按重要度排序，可能截断）。
 任务：
 1. overview：项目是什么、解决什么问题、整体架构 3-6 句。
@@ -184,9 +197,10 @@ BRIEFING_SYSTEM = """你是资深面试官，正在给候选人的代码仓库"�
    - purpose：职责一句话
    - tech_points：值得考的技术点（具体到库/模式/算法，如 "Hono SSE 流式"、"SQLAlchemy async session"）
    - exam_tags：从词表选 0-4 个：{TAGS}
-   - detail_questions：2-4 个"架构与设计拷打题"——模块职责边界/技术选型理由与代价/数据流与模块协作/规模化与失败场景（如 "X 和 Y 的职责为什么这样划分？"、"这个场景下如果量翻 10 倍哪里先出问题？"）。不要出函数级实现细节题（那是代码评审不是面试）。
-   - alternative_question：1 个"方案对比题"（"为什么用 A 而不用 <合理替代>？"——替代方案要真实合理，选型对比是面试最爱）
-   - missing_question：1 个"架构质询题"（架构级缺口：错误处理策略/降级路径/扩展性瓶颈/部署形态，只问代码里确实没做的）
+   - detail_questions：2-4 个"架构与设计拷打题"——模块职责边界、技术选型代价、
+     数据流协作、规模化与失败场景。不要出函数级实现细节题（那是代码评审，不是面试）。
+   - alternative_question：1 个"方案对比题"；替代方案要真实合理，比较选型理由与代价。
+   - missing_question：1 个"架构质询题"；只问代码里确实没做的架构级缺口。
 4. not_understood：内容不足无法判断的文件/区域。
 
 规则：忠于代码，不编造不存在的东西；missing_question 必须先确认代码里真的没做。"""
@@ -219,6 +233,7 @@ async def run_briefing(
     gateway: LLMGateway,
     *,
     tag_families: list[str],
+    repo_map_text: str = "",
     progress=None,
 ) -> RepoBriefing:
     from getoffer.ingest.qa_extract import TAG_FAMILIES as _default_tags
@@ -245,15 +260,20 @@ async def run_briefing(
 
     briefings: list[RepoBriefing] = []
     for batch_index, batch in enumerate(batches):
+        repo_map_section = (
+            f"## Tree-sitter repo map（结构先验）\n{repo_map_text}\n\n"
+            if repo_map_text
+            else ""
+        )
         content = (
             f"## 文件树（按重要度）\n{snapshot.tree_text()}\n\n"
             f"## 语言构成（后缀: 行数）\n{snapshot.language_mix()}\n\n"
-            f"## 文件内容（本批 {len(batch)} 字符）\n{batch}"
+            + repo_map_section
+            + f"## 文件内容（本批 {len(batch)} 字符）\n{batch}"
         )
         system = BRIEFING_SYSTEM.replace("{TAGS}", "、".join(tags))
-        await progress(
-            f"LLM 备课 第 {batch_index + 1}/{len(batches)} 批", 25 + int(55 * (batch_index + 1) / len(batches))
-        )
+        batch_progress = 25 + int(55 * (batch_index + 1) / len(batches))
+        await progress(f"LLM 备课 第 {batch_index + 1}/{len(batches)} 批", batch_progress)
         briefings.append(
             await gateway.complete_structured(
                 [{"role": "user", "content": content}],
@@ -310,25 +330,33 @@ async def prepare_project(
     *,
     zip_bytes: bytes | None,
     local_path: str | None,
+    git_url: str | None = None,
     name: str,
     session: AsyncSession,
     gateway: LLMGateway,
+    embedding_gateway: EmbeddingGateway | None = None,
     settings: Settings,
     resume_id: int | None = None,
 ) -> dict[str, Any]:
     """同步备课（内部实现）：供异步包装器与测试调用。流程与产物见 prepare_project_async。"""
-    result = await _run_preparation(
-        zip_bytes=zip_bytes, local_path=local_path, name=name,
-        session=session, gateway=gateway, settings=settings, resume_id=resume_id,
-        progress=lambda *_: None,
-    )
-    return result
+    owned_embedding_gateway = embedding_gateway is None
+    embedding_gateway = embedding_gateway or EmbeddingGateway(settings.embedding)
+    try:
+        return await _run_preparation(
+            zip_bytes=zip_bytes, local_path=local_path, git_url=git_url, name=name,
+            session=session, gateway=gateway, embedding_gateway=embedding_gateway,
+            settings=settings, resume_id=resume_id,
+        )
+    finally:
+        if owned_embedding_gateway:
+            await embedding_gateway.aclose()
 
 
 async def prepare_project_async(
     *,
     zip_bytes: bytes | None,
     local_path: str | None,
+    git_url: str | None,
     name: str,
     settings: Settings,
     resume_id: int | None,
@@ -338,20 +366,26 @@ async def prepare_project_async(
     长备课（分钟级）不再阻塞 HTTP 请求——前端轮询 GET /api/grill/projects/{id}。
     独立 engine/sessionmaker：后台任务不能复用请求级会话（请求结束即关）。
     """
-    import asyncio
-
     from getoffer.db import make_engine, make_sessionmaker
     from getoffer.llm.gateway import LLMGateway
 
     engine = make_engine(settings)
     maker = make_sessionmaker(engine)
     gateway = LLMGateway(settings.llm)
+    embedding_gateway = EmbeddingGateway(settings.embedding)
 
     async with maker() as db:
         project = Project(
             name=name,
             repo_path=str(local_path or (settings.projects_dir / name)),
-            meta={"status": "preparing", "step": "启动", "progress": 0},
+            meta={
+                "status": "preparing",
+                "step": "启动",
+                "progress": 0,
+                "source": {
+                    "kind": "git" if git_url else "local" if local_path else "zip",
+                },
+            },
         )
         db.add(project)
         await db.commit()
@@ -370,15 +404,23 @@ async def prepare_project_async(
         try:
             async with maker() as db:
                 result = await _run_preparation(
-                    zip_bytes=zip_bytes, local_path=local_path, name=name,
-                    session=db, gateway=gateway, settings=settings, resume_id=resume_id,
+                    zip_bytes=zip_bytes, local_path=local_path, git_url=git_url, name=name,
+                    session=db, gateway=gateway, embedding_gateway=embedding_gateway,
+                    settings=settings, resume_id=resume_id,
                     progress=progress, existing_project_id=project_id,
                 )
             async with maker() as db2:
                 row = await db2.get(Project, project_id)
                 if row is not None:
                     meta = dict(row.meta or {})
-                    meta.update({"status": "ready", "step": "完成", "progress": 100, "file_count": result["file_count"]})
+                    meta.update(
+                        {
+                            "status": "ready",
+                            "step": "完成",
+                            "progress": 100,
+                            "file_count": result["file_count"],
+                        }
+                    )
                     row.meta = meta
                     await db2.commit()
         except Exception as exc:  # 失败显式落库（不静默）
@@ -389,6 +431,10 @@ async def prepare_project_async(
                     meta.update({"status": "failed", "error": str(exc)[:400]})
                     row.meta = meta
                     await db2.commit()
+        finally:
+            await gateway.aclose()
+            await embedding_gateway.aclose()
+            await engine.dispose()
 
     asyncio.create_task(run())
     return project_id
@@ -398,46 +444,47 @@ async def _run_preparation(
     *,
     zip_bytes: bytes | None,
     local_path: str | None,
+    git_url: str | None,
     name: str,
     session: AsyncSession,
     gateway: LLMGateway,
+    embedding_gateway: EmbeddingGateway,
     settings: Settings,
     resume_id: int | None = None,
     progress=None,
     existing_project_id: int | None = None,
 ) -> dict[str, Any]:
-    """两种接入：zip 上传（解压到 data/projects/{name}）或 本地目录路径（原位读取，零拷贝——
-    本地部署形态下最自然，dsh 式工作流）。收集 → 备课 → 声明对照 → 落库。"""
+    """三种来源经 Source 适配后走同一分析、备课、声明对照与落库流程。"""
     if progress is None:
         async def progress(step: str, pct: int) -> None:  # noqa: F811
             return None
 
-    if zip_bytes is not None:
-        project_root = settings.projects_dir / name
-        if project_root.exists():
-            raise ValidationFailed(f"项目目录已存在: {name}（请换名或先删除）")
-        written, skipped = extract_zip_safely(zip_bytes, project_root)
-        if written == 0:
-            raise ValidationFailed("zip 内没有有效文件（全部被噪声过滤或为空包）")
-        await progress("解压完成，收集文件", 10)
-    elif local_path:
-        candidate = Path(local_path)
-        if not candidate.is_absolute():
-            raise ValidationFailed("local_path 必须是绝对路径（本地部署形态，用户显式指定）")
-        if not candidate.is_dir():
-            raise ValidationFailed(f"目录不存在或不是目录: {local_path}")
-        project_root = candidate
-        skipped = []
-    else:
-        raise ValidationFailed("需要 zip 文件或 local_path 目录路径之一")
+    await progress("获取并校验仓库", 5)
+    acquired = await acquire_repository(
+        zip_bytes=zip_bytes,
+        local_path=local_path,
+        git_url=git_url,
+        name=name,
+        projects_dir=settings.projects_dir,
+        git_proxy=settings.git_proxy,
+    )
+    project_root = acquired.root
+    skipped = list(acquired.skipped_dirs)
+    await progress(f"{acquired.kind} 仓库就绪，收集文件", 10)
     snapshot = collect_files(project_root)
-    await progress(f"收集 {len(snapshot.files)} 个文件，LLM 备课中", 25)
+    await progress(f"收集 {len(snapshot.files)} 个文件，Tree-sitter 分析中", 18)
 
-    briefing = await run_briefing(snapshot, gateway, tag_families=[], progress=progress)
-    await progress("备课完成，简历声明对照中", 80)
+    analysis = analyze_files(
+        snapshot.files,
+        cache_dir=settings.data_dir / "tree-sitter-cache",
+    )
+    repo_map = build_repo_map(snapshot.files, analysis)
+    chunks = normalize_chunks(analysis.chunks)
+    await progress(f"结构分析完成（{analysis.parsed_files} 文件 / {len(chunks)} 代码块）", 25)
 
     claims: list[str] = []
     resume_used = False
+    candidate_name: str | None = None
     if resume_id is not None:
         resume = await session.get(Resume, resume_id)
         if resume is None:
@@ -446,7 +493,50 @@ async def _run_preparation(
             (await session.scalars(select(ResumeClaim).where(ResumeClaim.resume_id == resume_id))).all()
         )
         claims = [row.claim_text for row in claim_rows][:12]
+        parsed_resume = resume.parsed if isinstance(resume.parsed, dict) else {}
+        raw_name = parsed_resume.get("candidate_name")
+        candidate_name = str(raw_name).strip() if raw_name else None
         resume_used = True
+
+    ownership = await asyncio.to_thread(
+        analyze_git_ownership,
+        project_root,
+        candidate_name=candidate_name,
+        max_commits=int(acquired.metadata.get("history_limit") or 500),
+    )
+
+    embedding_batch = None
+    if embedding_gateway.configured and chunks:
+        await progress(f"生成 {len(chunks)} 个代码块向量", 32)
+        embedding_batch = await embedding_gateway.embed([chunk.embedding_input() for chunk in chunks])
+        semantic_meta = {
+            "status": "ready",
+            "provider": settings.embedding.provider,
+            "model": embedding_batch.model,
+            "dimension": embedding_batch.dimension,
+            "chunk_count": len(chunks),
+            "vector_count": len(embedding_batch.vectors),
+        }
+    else:
+        semantic_meta = {
+            "status": "disabled",
+            "provider": settings.embedding.provider,
+            "model": None,
+            "dimension": None,
+            "chunk_count": len(chunks),
+            "vector_count": 0,
+            "reason": "embedding_not_configured" if not embedding_gateway.configured else "no_chunks",
+        }
+
+    briefing = await run_briefing(
+        snapshot,
+        gateway,
+        tag_families=[],
+        repo_map_text=repo_map.text,
+        progress=progress,
+    )
+    await progress("备课完成，简历声明对照中", 80)
+
     claim_checks: list[ClaimCheck] = []
     if claims:
         claim_checks = await check_claims(claims, briefing, gateway)
@@ -456,11 +546,18 @@ async def _run_preparation(
         if project is None:
             raise ValidationFailed(f"项目行不存在: {existing_project_id}")
         project.repo_path = str(project_root)
+        project.head_commit = ownership.get("head_commit") if ownership.get("available") else None
         meta = dict(project.meta or {})
         meta["skipped_dirs"] = skipped
+        meta["source"] = acquired.metadata
         project.meta = meta
     else:
-        project = Project(name=name, repo_path=str(project_root), meta={"skipped_dirs": skipped})
+        project = Project(
+            name=name,
+            repo_path=str(project_root),
+            head_commit=ownership.get("head_commit") if ownership.get("available") else None,
+            meta={"skipped_dirs": skipped, "source": acquired.metadata},
+        )
         session.add(project)
         await session.flush()
     # 备课产物存在则覆盖（异步重试语义）
@@ -470,8 +567,23 @@ async def _run_preparation(
     for artifact in existing_artifacts:
         await session.delete(artifact)
     await session.flush()
+    await replace_project_chunks(
+        session,
+        project_id=project.id,
+        chunks=chunks,
+        embeddings=embedding_batch,
+    )
+    capabilities = {
+        "repo_map": bool(repo_map.text and repo_map.parsed_files),
+        "semantic_search": semantic_meta["status"] == "ready",
+        "git_ownership": bool(ownership.get("available")),
+    }
     for kind, payload in (
         ("tree", {"files": [f.rel_path for f in snapshot.files], "language_mix": snapshot.language_mix()}),
+        ("repomap", repo_map.artifact()),
+        ("semantic_index", semantic_meta),
+        ("ownership", ownership),
+        ("capabilities", capabilities),
         ("briefing", briefing.model_dump()),
         ("claims", [c.model_dump() for c in claim_checks]),
     ):
@@ -487,4 +599,30 @@ async def _run_preparation(
         "language_mix": snapshot.language_mix(),
         "briefing": briefing.model_dump(),
         "claim_checks": [c.model_dump() for c in claim_checks],
+        "capabilities": capabilities,
+        "repomap_summary": {
+            "parsed_files": repo_map.parsed_files,
+            "supported_files": repo_map.supported_files,
+            "coverage": repo_map.coverage,
+            "edge_count": repo_map.edge_count,
+        },
+        "semantic_index": semantic_meta,
+        "ownership_summary": _ownership_summary(ownership),
+    }
+
+
+def _ownership_summary(ownership: dict[str, Any]) -> dict[str, Any]:
+    if not ownership.get("available"):
+        return {"available": False, "reason": ownership.get("reason", "unknown")}
+    scope = ownership.get("history_scope") or {}
+    return {
+        "available": True,
+        "commits_analyzed": scope.get("commits_analyzed", 0),
+        "truncated": bool(scope.get("truncated")),
+        "shallow": bool(scope.get("shallow")),
+        "contributors": [
+            {"name": item.get("name"), "commits": item.get("commits")}
+            for item in (ownership.get("contributors") or [])[:5]
+        ],
+        "candidate": ownership.get("candidate"),
     }

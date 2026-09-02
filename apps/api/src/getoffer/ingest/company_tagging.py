@@ -6,7 +6,6 @@ track 只能使用四类词表，词表外输出在入库前被硬校验丢弃�
 """
 
 from pydantic import BaseModel, Field
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,11 +47,13 @@ DEFAULT_COMPANIES = [
 DEFAULT_COMPANY_NAMES = [name for name, _, _ in DEFAULT_COMPANIES]
 
 TRACK_GUIDE = """岗位大类判定：
-- 大模型应用：Agent/RAG/MCP/多智能体/Prompt 工程/评测落地/推理部署等工程与系统实现题（通常说的 Agent 应用就在这类）
+- 大模型应用：Agent/RAG/MCP/多智能体/Prompt 工程/评测落地/推理部署等工程与系统实现题
+  （通常说的 Agent 应用就在这类）
 - 大模型算法：预训练/SFT/RLHF/强化学习/蒸馏/模型结构(注意力/位置编码)/解码采样/Scaling 等训练与原理题
 - 大模型应用算法：应用侧的算法问题（检索算法/重排/embedding 微调/RAG 评测算法/Agent 规划/数据合成）
 - 视觉算法：CV 经典与视觉模型题（图像分类/检测/分割/CNN/ViT/多模态视觉理解）
-- 通用基础：LeetCode 算法、计算机网络/操作系统等工程基础、HR 面（机器学习/CV 基础请优先归入机器学习基础或视觉算法）"""
+- 通用基础：LeetCode 算法、计算机网络/操作系统等工程基础、HR 面
+  （机器学习/CV 基础请优先归入机器学习基础或视觉算法）"""
 
 
 class CompanyTagItem(BaseModel):

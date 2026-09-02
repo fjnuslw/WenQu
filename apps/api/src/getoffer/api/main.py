@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from getoffer.config import load_settings
 from getoffer.db import Base, make_engine, make_sessionmaker
 from getoffer.errors import UpstreamError, install_error_handlers
+from getoffer.grill.embeddings import EmbeddingGateway
 from getoffer.llm.gateway import LLMGateway
 from getoffer.models import LLMCall
 from getoffer.search.meili import QUESTIONS_INDEX, MeiliIndexer
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
             usage_sink=lambda usage: _record_llm_usage(app.state.sessionmaker, usage),
         )
         app.state.voice_gateway = VoiceGateway(settings.tts)
+        app.state.embedding_gateway = EmbeddingGateway(settings.embedding)
         app.state.meili = MeiliIndexer(settings)
         try:
             await app.state.meili.ensure_index(QUESTIONS_INDEX)
@@ -54,6 +56,7 @@ def create_app() -> FastAPI:
         yield
         await app.state.gateway.aclose()
         await app.state.voice_gateway.aclose()
+        await app.state.embedding_gateway.aclose()
         await app.state.meili.aclose()
         await app.state.engine.dispose()
 

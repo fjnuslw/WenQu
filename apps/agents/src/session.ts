@@ -147,10 +147,17 @@ export class SessionManager {
     let sessionRef: RunningSession | null = null;
     if (config.mode === "grill" && config.grill) {
       // 项目拷打（G1）：只读工具面（路径监狱锚定临时仓库根），备课产物经首轮指令注入
-      const tools = buildGrillTools(config.grill.repoRoot);
+      const tools = buildGrillTools(config.grill.repoRoot, {
+        projectId: config.grill.projectId,
+        apiBaseUrl: this.config.apiBaseUrl,
+        capabilities: config.grill.capabilities,
+      });
       agent = this.runtime.agentFactory(
-        grillSystemPrompt(config.maxFollowUpDepth),
-        [tools.listFiles, tools.readFile, tools.searchCode],
+        grillSystemPrompt(
+          config.maxFollowUpDepth,
+          tools.all.map((tool) => tool.name),
+        ),
+        tools.all,
         thinkingLevel,
         id,
       );

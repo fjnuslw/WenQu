@@ -1,11 +1,11 @@
 /**
  * 项目拷打只读工具面（G1，research/06 §5）：
- * list_files / read_file / search_code——刻意排除 write/bash（拷打官只能读不能改）。
+ * 本地基础工具 + API 能力工具——刻意排除 write/bash（拷打官只能读不能改）。
  * 路径监狱：所有读取 resolve 后必须仍在项目根内；单文件读取上限 64KB。
  * execute 签名：(toolCallId, params, ...)——pi-agent-core 契约（web-search 踩坑后固化）。
  */
 
-import { readdir, stat } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -15,7 +15,9 @@ const MAX_LIST_ENTRIES = 300;
 const MAX_SEARCH_HITS = 40;
 
 const EXCLUDE_DIRS = new Set([
-  ".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "out", ".next",
+  ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "__pycache__", "dist", "build",
+  "out", "target", ".next", ".turbo", "coverage", ".idea", ".vscode", ".tmp", ".ruff_cache",
+  ".workbuddy", ".zcode", "miniprogram_npm", "uni_modules", "unpackage", "vendor", "Pods",
 ]);
 
 /** 路径监狱：把用户给的相对路径安全拼到项目根，逃逸即抛错（不静默兜底）。 */
@@ -28,9 +30,19 @@ function jailResolve(root: string, relPath: string): string {
   return target;
 }
 
+/** Existing-path guard: lexical containment alone is insufficient when a repository has symlinks. */
+async function jailExisting(root: string, relPath: string): Promise<string> {
+  const lexicalTarget = jailResolve(root, relPath);
+  const [realRoot, realTarget] = await Promise.all([realpath(path.resolve(root)), realpath(lexicalTarget)]);
+  if (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep)) {
+    throw new Error(`符号链接越界（只能访问项目内文件）: ${relPath}`);
+  }
+  return realTarget;
+}
+
 async function walkFiles(root: string, relDir: string, out: string[], depth: number): Promise<void> {
   if (out.length >= MAX_LIST_ENTRIES || depth > 8) return;
-  const absDir = jailResolve(root, relDir);
+  const absDir = await jailExisting(root, relDir);
   const entries = await readdir(absDir, { withFileTypes: true });
   for (const entry of entries.sort((a, b) => (a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1))) {
     if (out.length >= MAX_LIST_ENTRIES) return;
@@ -49,9 +61,23 @@ export interface GrillTools {
   listFiles: AgentTool;
   readFile: AgentTool;
   searchCode: AgentTool;
+  getRepoMap?: AgentTool;
+  semanticSearch?: AgentTool;
+  getGitOwnership?: AgentTool;
+  all: AgentTool[];
 }
 
-export function buildGrillTools(projectRoot: string): GrillTools {
+export interface GrillToolOptions {
+  projectId: number;
+  apiBaseUrl: string;
+  capabilities?: {
+    repoMap?: boolean;
+    semanticSearch?: boolean;
+    gitOwnership?: boolean;
+  };
+}
+
+export function buildGrillTools(projectRoot: string, options?: GrillToolOptions): GrillTools {
   const listFiles: AgentTool = {
     name: "list_files",
     label: "列目录",
@@ -92,7 +118,7 @@ export function buildGrillTools(projectRoot: string): GrillTools {
       if (typeof args?.path !== "string" || !args.path.trim()) {
         throw new Error("read_file 需要非空字符串参数 path");
       }
-      const abs = jailResolve(projectRoot, args.path.replace(/\\/g, "/"));
+      const abs = await jailExisting(projectRoot, args.path.replace(/\\/g, "/"));
       const info = await stat(abs);
       if (!info.isFile()) throw new Error(`不是文件: ${args.path}`);
       const raw = await readFileUtf8(abs);
@@ -139,7 +165,134 @@ export function buildGrillTools(projectRoot: string): GrillTools {
     },
   } as unknown as AgentTool;
 
-  return { listFiles, readFile, searchCode };
+  const getRepoMap =
+    options?.capabilities?.repoMap === true
+      ? ({
+          name: "get_repo_map",
+          label: "看仓库地图",
+          description:
+            "读取 Tree-sitter 符号引用图排序后的仓库地图。适合先找架构中心和关键符号，再用 read_file 核证。",
+          parameters: { type: "object", properties: {}, additionalProperties: false },
+          execute: async () => {
+            const data = await apiJson(
+              options.apiBaseUrl,
+              `/api/grill/projects/${options.projectId}/map`,
+            );
+            const text = typeof data.text === "string" ? data.text : "";
+            if (!text) throw new Error("repo map 为空");
+            return {
+              content: [{ type: "text", text }],
+              details: {
+                parsedFiles: data.parsed_files,
+                coverage: data.coverage,
+                edgeCount: data.edge_count,
+              },
+            };
+          },
+        } as unknown as AgentTool)
+      : undefined;
+
+  const semanticSearch =
+    options?.capabilities?.semanticSearch === true
+      ? ({
+          name: "semantic_search",
+          label: "语义搜代码",
+          description:
+            "按自然语言语义搜索项目代码块，返回相关的文件:行号和源码。用于不知道函数名、只知道职责时定位实现。",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "自然语言职责或设计意图，一次只搜一个目标" },
+              limit: { type: "number", description: "返回 1-8 条，省略为 5" },
+            },
+            required: ["query"],
+            additionalProperties: false,
+          },
+          execute: async (_toolCallId: string, args: { query: string; limit?: number }) => {
+            const query = typeof args?.query === "string" ? args.query.trim() : "";
+            if (!query) throw new Error("semantic_search 需要非空字符串参数 query");
+            const data = await apiJson(
+              options.apiBaseUrl,
+              `/api/grill/projects/${options.projectId}/search`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query, limit: Math.max(1, Math.min(args.limit ?? 5, 8)) }),
+              },
+            );
+            const hits = Array.isArray(data.hits) ? data.hits : [];
+            const text = hits.length
+              ? hits
+                  .map((raw) => {
+                    const hit = raw as Record<string, unknown>;
+                    const pathValue = String(hit.path ?? "unknown");
+                    const start = Number(hit.start_line ?? 1);
+                    const end = Number(hit.end_line ?? start);
+                    const score = Number(hit.score ?? 0).toFixed(3);
+                    const content = String(hit.content ?? "").slice(0, 2200);
+                    return `${pathValue}:${start}-${end} [score=${score}]\n${content}`;
+                  })
+                  .join("\n\n---\n\n")
+              : `没有找到与「${query}」相关的语义结果`;
+            return { content: [{ type: "text", text }], details: { count: hits.length, query } };
+          },
+        } as unknown as AgentTool)
+      : undefined;
+
+  const getGitOwnership =
+    options?.capabilities?.gitOwnership === true
+      ? ({
+          name: "get_git_ownership",
+          label: "查 Git 归属",
+          description:
+            "读取 Git 历史归属摘要；可传相对路径查看该文件主要作者。只用于核实候选人贡献，不把提交量等同于能力。",
+          parameters: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "可选的项目内相对文件路径" },
+            },
+            additionalProperties: false,
+          },
+          execute: async (_toolCallId: string, args: { path?: string }) => {
+            const pathQuery = args?.path?.trim()
+              ? `?path=${encodeURIComponent(args.path.trim())}`
+              : "";
+            const data = await apiJson(
+              options.apiBaseUrl,
+              `/api/grill/projects/${options.projectId}/ownership${pathQuery}`,
+            );
+            return {
+              content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+              details: { path: args?.path ?? null },
+            };
+          },
+        } as unknown as AgentTool)
+      : undefined;
+
+  const all = [listFiles, readFile, searchCode, getRepoMap, semanticSearch, getGitOwnership].filter(
+    (tool): tool is AgentTool => tool !== undefined,
+  );
+  return { listFiles, readFile, searchCode, getRepoMap, semanticSearch, getGitOwnership, all };
+}
+
+async function apiJson(
+  baseUrl: string,
+  apiPath: string,
+  init?: RequestInit,
+): Promise<Record<string, unknown>> {
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+  const response = await fetch(`${normalizedBase}${apiPath}`, init);
+  const payload = (await response.json().catch(() => null)) as
+    | Record<string, unknown>
+    | null;
+  if (!response.ok) {
+    const error = payload?.error as { message?: unknown } | undefined;
+    throw new Error(
+      typeof error?.message === "string" ? error.message : `仓库智能 API 返回 ${response.status}`,
+    );
+  }
+  if (!payload) throw new Error("仓库智能 API 返回非 JSON 响应");
+  return payload;
 }
 
 async function readFileUtf8(abs: string): Promise<string> {
@@ -150,7 +303,7 @@ async function readFileUtf8(abs: string): Promise<string> {
 
 async function searchWalk(root: string, relDir: string, query: string, hits: string[]): Promise<void> {
   if (hits.length >= MAX_SEARCH_HITS) return;
-  const absDir = jailResolve(root, relDir);
+  const absDir = await jailExisting(root, relDir);
   const entries = await readdir(absDir, { withFileTypes: true });
   for (const entry of entries) {
     if (hits.length >= MAX_SEARCH_HITS) return;
@@ -159,8 +312,8 @@ async function searchWalk(root: string, relDir: string, query: string, hits: str
       if (EXCLUDE_DIRS.has(entry.name)) continue;
       await searchWalk(root, rel, query, hits);
     } else {
-      const abs = path.join(absDir, entry.name);
       try {
+        const abs = await jailExisting(root, rel);
         const info = await stat(abs);
         if (!info.isFile() || info.size > MAX_READ_BYTES * 4) continue;
         const text = await readFileUtf8(abs);

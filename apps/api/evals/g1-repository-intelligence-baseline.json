@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "evaluatedAt": "2026-09-02T11:05:36Z",
+  "implementationHead": "8966f3962567666f91b1a78d6f10208b1b9cddc4",
+  "workingTreeIncluded": true,
+  "implementationVerified": true,
+  "releaseGatePassed": false,
+  "releaseGateBlocker": "GETOFFER_EMBEDDING__PROVIDER is disabled; no configured embedding Provider was available for semantic-quality verification.",
+  "currentRepository": {
+    "snapshotFiles": 232,
+    "supportedFiles": 177,
+    "parsedFiles": 177,
+    "parseCoverage": 1.0,
+    "parseFailures": 0,
+    "syntaxChunks": 370,
+    "repoMapChars": 5970,
+    "repoMapEdges": 3004,
+    "gitCommitsAnalyzed": 56
+  },
+  "pgvector": {
+    "database": "PostgreSQL with pgvector",
+    "queryMode": "semantic",
+    "indexedRealChunks": 370,
+    "query": "代码语义检索和 pgvector 余弦距离查询在哪里实现？",
+    "expectedPath": "apps/api/src/getoffer/grill/retrieval.py",
+    "expectedPathRank": 5,
+    "wiringVerified": true,
+    "providerVerified": false,
+    "evidenceClass": "deterministic fixture vectors over real code chunks",
+    "command": "cd apps/api; ./.venv/Scripts/python.exe scripts/verify_g1_repository_intelligence.py"
+  },
+  "publicGit": {
+    "url": "https://github.com/pallets/itsdangerous.git",
+    "headCommit": "672971d66a2ef9f85151e53283113f33d642dabd",
+    "status": "ready",
+    "snapshotFiles": 32,
+    "supportedFiles": 15,
+    "parsedFiles": 15,
+    "parseCoverage": 1.0,
+    "syntaxChunks": 24,
+    "commitsAnalyzed": 200,
+    "shallow": true,
+    "contributorsReturned": 10,
+    "temporaryProjectRemoved": true
+  },
+  "agentAudit": {
+    "sessionId": "bdc242cb-193b-44d3-82c0-7f00c69cbd78",
+    "capabilities": {
+      "repoMap": true,
+      "semanticSearch": false,
+      "gitOwnership": true
+    },
+    "toolSequence": [
+      "get_repo_map",
+      "read_file",
+      "list_files",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ],
+    "usedRepoMapBeforeQuestion": true,
+    "usedReadFileBeforeCodeClaim": true,
+    "semanticToolHiddenWhenDisabled": true,
+    "replyChars": 289,
+    "followUpDebt": "First-turn evidence collection and visible question are too verbose; handle in a dedicated grill interaction/output-gate spec."
+  },
+  "regression": {
+    "apiPytest": "121 passed",
+    "apiRuff": "passed",
+    "agents": "29 passed; typecheck passed",
+    "web": "5 passed; typecheck passed; production build passed",
+    "services": "api/agents/web healthy on 23480/23481/23482"
+  }
+}

@@ -37,11 +37,15 @@ export const HINT_LADDER: readonly string[] = [
 ];
 
 /** 项目拷打官 system prompt（G1）：稳定头（缓存友好），项目细节经首轮指令注入。 */
-export function grillSystemPrompt(maxFollowUpDepth: number): string {
+export function grillSystemPrompt(maxFollowUpDepth: number, toolNames: string[] = []): string {
+  const visibleTools = toolNames.length ? toolNames.join(" / ") : "list_files / read_file / search_code";
+  const hasRepoMap = toolNames.includes("get_repo_map");
+  const hasSemantic = toolNames.includes("semantic_search");
+  const hasOwnership = toolNames.includes("get_git_ownership");
   return [
     "你是大模型应用/Agent 岗的资深项目拷打官——候选人带着一个真实项目来，你要像最较真的面试官一样，把这个项目里候选人写的代码逐层问透。",
     "",
-    "你有一个只读工具面（list_files / read_file / search_code）可以随时查证项目源码。",
+    `你本场可用的只读工具只有：${visibleTools}。`,
     "",
     "拷打原则（真实面试的项目拷打，不是代码评审）：",
     "1. 【重心在架构与设计决策】主要考察：模块划分与职责边界、技术选型的理由与代价、数据流与模块间协作、复杂度/规模化的应对、失败与降级策略。面试官关心'你为什么这样设计'，而不是'这个函数第几行怎么写'。",
@@ -52,10 +56,21 @@ export function grillSystemPrompt(maxFollowUpDepth: number): string {
     "6. 听完回答先在架构层追问（为什么/代价/边界），再决定是否下沉查证。",
     "7. 你只在有把握时才断言代码内容——不确定就先用工具查，别猜。",
     "8. 【诚实纪律】禁止声称'我已通读/我看了 X 文件'，除非你本轮真的用 read_file 读过它；引用行号必须来自真实读取。备课简报只是线索，提问前先用工具核对你要考的那个模块的真实代码。引用代码时一律用 `相对路径:行号` 格式（如 `src/server.ts:143`；行范围写 `143-161`）——候选人界面会把这种引用渲染成可点击跳转。",
-    "9. 语气专业克制，不羞辱不闲聊；单轮回复 120 字以内，问题必须清晰可答。",
-    "10. 每轮开头的[导演指令]是系统控制信号，对候选人不复述、不解释。",
-    "11. 思考过程用中文写。",
-  ].join("\n");
+    hasRepoMap
+      ? "9. 【结构地图】开场问题前必须先调用一次 get_repo_map 选择架构中心；地图只是导航，具体断言仍须 read_file。"
+      : "",
+    hasSemantic
+      ? "10. 不知道实现名、只知道职责时用 semantic_search；已知函数/类名时优先 search_code，命中后再 read_file。"
+      : "",
+    hasOwnership
+      ? "11. 只有问题涉及候选人个人贡献时才用 get_git_ownership；提交量不能直接当作能力结论。"
+      : "",
+    "12. 语气专业克制，不羞辱不闲聊；单轮回复 120 字以内，问题必须清晰可答。",
+    "13. 每轮开头的[导演指令]是系统控制信号，对候选人不复述、不解释。",
+    "14. 思考过程用中文写。",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** 项目拷打首轮注入的会话上下文（备课产物）：进历史而非 systemPrompt，保住前缀缓存。 */

@@ -20,7 +20,11 @@ class MeiliIndexer:
     def __init__(self, settings: Settings) -> None:
         self._client = httpx.AsyncClient(
             base_url=settings.meilisearch_url,
-            headers={"Authorization": f"Bearer {settings.meilisearch_key}"} if settings.meilisearch_key else {},
+            headers=(
+                {"Authorization": f"Bearer {settings.meilisearch_key}"}
+                if settings.meilisearch_key
+                else {}
+            ),
             timeout=httpx.Timeout(60.0),
         )
 
@@ -61,7 +65,13 @@ class MeiliIndexer:
             },
         )
 
-    async def upsert_documents(self, uid: str, documents: list[dict[str, Any]], *, wait: bool = False) -> None:
+    async def upsert_documents(
+        self,
+        uid: str,
+        documents: list[dict[str, Any]],
+        *,
+        wait: bool = False,
+    ) -> None:
         if not documents:
             return
         task = await self._request("POST", f"/indexes/{uid}/documents", json_body=documents)

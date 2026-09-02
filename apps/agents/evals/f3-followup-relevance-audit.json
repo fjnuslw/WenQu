@@ -2,7 +2,14 @@
   "auditedAt": "2026-09-01T11:29:29.826Z",
   "sourceSessionId": "1aee86be-94a0-462e-8679-7abc924e971c",
   "protocolVariant": "one_step_question_arg",
-  "implementationSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+  "implementationSha256": "5aada10a51ebb7298e6b57e2dbdf9fa59705442757e06d5550a29b44bd0c8e9c",
+  "implementationScopeVersion": "f3-dedicated-v2",
+  "signatureMigration": {
+    "migratedOn": "2026-09-02",
+    "previousSha256": "0c4eef1267c21c4301ea7432cf148418c12f492d6395215703f2126e5d75bc83",
+    "reason": "G1-only capability wiring changed shared server/session/type files but did not change any F3 domain implementation file.",
+    "metricsRerun": false
+  },
   "dataClass": "repository-authored synthetic fixtures",
   "auditMethod": "逐条人工语义审计 JSONL 中候选人可见的 probe 回复；不读取隐藏思维链",
   "rubric": "追问必须承接当前 target，并针对候选人刚才回答中影响核心判断的明确缺口；泛泛要求‘再详细些’或一次抛出多个主要问题不计相关。",

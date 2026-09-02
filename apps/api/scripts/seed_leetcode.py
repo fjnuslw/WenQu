@@ -17,7 +17,7 @@ from sqlalchemy import select  # noqa: E402
 from getoffer.config import load_settings  # noqa: E402
 from getoffer.db import make_engine, make_sessionmaker  # noqa: E402
 from getoffer.models import Question, Tag  # noqa: E402
-from getoffer.search.meili import MeiliIndexer, QUESTIONS_INDEX  # noqa: E402
+from getoffer.search.meili import QUESTIONS_INDEX, MeiliIndexer  # noqa: E402
 
 DIFFICULTY_MAP = {"E": 1, "M": 3, "H": 4}
 SEED_PATH = Path(__file__).resolve().parents[3] / "data" / "seeds" / "leetcode_hot100.json"
@@ -44,7 +44,7 @@ async def main() -> None:
 
         for entry in entries:
             # 稳定幂等键的 sha256（content_hash 列宽 64，统一走 hex 摘要）
-            content_hash = hashlib.sha256(f"lc-hot100:{entry['slug']}".encode("utf-8")).hexdigest()
+            content_hash = hashlib.sha256(f"lc-hot100:{entry['slug']}".encode()).hexdigest()
             exists = await session.scalar(select(Question).where(Question.content_hash == content_hash))
             if exists is not None:
                 continue

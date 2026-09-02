@@ -4,7 +4,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-import { f3ImplementationSha256 } from "./eval-signature.js";
+import {
+  F3_IMPLEMENTATION_SCOPE_VERSION,
+  f3ImplementationSha256,
+} from "./eval-signature.js";
 
 interface DecisionFixture {
   id: string;
@@ -54,6 +57,7 @@ test("提交的实模基线绑定当前 fixture，且决策与追问相关性均
   ) as {
     fixtureSha256: string;
     implementationSha256: string;
+    implementationScopeVersion: string;
     protocolVariant: string;
     metrics: {
       total: number;
@@ -72,6 +76,7 @@ test("提交的实模基线绑定当前 fixture，且决策与追问相关性均
     await f3ImplementationSha256(),
     "F3 关键实现变更后必须重跑真实模型基线",
   );
+  assert.equal(baseline.implementationScopeVersion, F3_IMPLEMENTATION_SCOPE_VERSION);
   assert.equal(baseline.protocolVariant, "one_step_question_arg");
   assert.equal(baseline.metrics.total, 50);
   assert.ok(baseline.metrics.accuracy >= 0.85);
@@ -95,12 +100,14 @@ test("一步协议性能基线绑定当前 fixture，p50 回归不超过 2.2 倍
   ) as {
     fixtureSha256: string;
     implementationSha256: string;
+    implementationScopeVersion: string;
     protocolVariant: string;
     metrics: { decisionCoverage: number; retryRate: number; p50Ratio: number };
     passed: boolean;
   };
   assert.equal(baseline.fixtureSha256, createHash("sha256").update(fixtureRaw).digest("hex"));
   assert.equal(baseline.implementationSha256, await f3ImplementationSha256());
+  assert.equal(baseline.implementationScopeVersion, F3_IMPLEMENTATION_SCOPE_VERSION);
   assert.equal(baseline.protocolVariant, "one_step_question_arg");
   assert.equal(baseline.metrics.decisionCoverage, 1);
   assert.equal(baseline.metrics.retryRate, 0);
@@ -115,6 +122,7 @@ test("最终一步协议长面基线绑定当前实现并满足完整结束条�
     sourceSessionId: string;
     protocolVariant: string;
     implementationSha256: string;
+    implementationScopeVersion: string;
     dataClass: string;
     metrics: {
       durationSeconds: number;
@@ -131,6 +139,7 @@ test("最终一步协议长面基线绑定当前实现并满足完整结束条�
 
   assert.equal(baseline.protocolVariant, "one_step_question_arg");
   assert.equal(baseline.implementationSha256, await f3ImplementationSha256());
+  assert.equal(baseline.implementationScopeVersion, F3_IMPLEMENTATION_SCOPE_VERSION);
   assert.equal(baseline.dataClass, "repository-authored synthetic fixtures");
   assert.ok(baseline.metrics.durationSeconds >= 30 * 60);
   assert.ok(baseline.metrics.probeChains >= 8);
@@ -147,6 +156,7 @@ test("最终一步协议长面基线绑定当前实现并满足完整结束条�
     sourceSessionId: string;
     protocolVariant: string;
     implementationSha256: string;
+    implementationScopeVersion: string;
     sampleCount: number;
     relevantCount: number;
     relevanceRate: number;
@@ -154,6 +164,7 @@ test("最终一步协议长面基线绑定当前实现并满足完整结束条�
   assert.equal(audit.sourceSessionId, baseline.sourceSessionId);
   assert.equal(audit.protocolVariant, baseline.protocolVariant);
   assert.equal(audit.implementationSha256, baseline.implementationSha256);
+  assert.equal(audit.implementationScopeVersion, F3_IMPLEMENTATION_SCOPE_VERSION);
   assert.equal(audit.relevantCount, audit.sampleCount);
   assert.ok(audit.sampleCount >= 8);
   assert.ok(audit.relevanceRate >= 0.8);

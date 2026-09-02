@@ -19,3 +19,4 @@
 |---|---|---|---|
 | [IMP-F3-001](./IMP-F3-001-interview-orchestration-v2.md) | F3 模拟面试 | 最小决策协议与 Harness 编排 v2 | Verified |
 | [IMP-F3-002](./IMP-F3-002-grounded-chinese-interview-and-voice.md) | F3 模拟面试 | 中文面试、简历证据化深挖与可替换语音输出 | Implementing |
+| [IMP-G1-001](./IMP-G1-001-repository-intelligence-v2.md) | G1 项目拷打 | Tree-sitter repo map、pgvector 语义检索与 Git 归属 | Implementing（仅 Provider 验收门） |
