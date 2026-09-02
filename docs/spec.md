@@ -131,6 +131,15 @@ JD 匹配度（关键词缺口/经历映射）· 简历押题（与 F3 共享解
 ### F6 学习追踪
 错题本 + SM-2 间隔重复 · 标签掌握度图谱 · 面试失分点回流 · Anki 导出 · 今日复习计划。
 
+### F7 学习路径（2026-08-30 立项）
+四条有序路径（**大模型应用 / 大模型算法 / 大模型开发 / 大厂手撕算法**）+ 共用前置 L0：路径 → 阶段 → 节点三级结构，节点带**目标 / 产出物 / 验收判据 / 资源引用 + 资源锚点（pins）**，可订阅、可勾选进度、可回流。
+**资源锚点**把「去看这个项目」精确到「看这个文件的这一节」：每个资源引用可挂 1–N 个 `{label, url}` 锚点（文档页 / 仓库内文件 / 具体题号），锚点 URL 必须比资源首页更具体（否则加载期校验拦截）。当前 **161 个锚点**，全部经 GitHub 目录树 / llms.txt / sitemap 取证并做存活探测（失效 0）。
+资源侧共 **141 条**（必学 51），全部经 GitHub API 与 HTTP 探测取证（star/license/最近推送/链接状态），**GPL/AGPL 一律不收录**（§10 门禁）。
+与既有模块咬合：节点 `related.tags` → F2 题库跳转；节点完成 → F6 生成复习卡（source=`path`）；实战节点产出物 → F4 项目拷打；手撕线题单 ← F1 面经频率榜（后期回灌）。
+**目录（内容）受版本控制不落库，进度（用户状态）落库** —— 改文案走 Git 可评审，改状态走 API。
+**验收**：四条路径可浏览可订阅；节点可勾选进度且刷新后保持；一个节点可一键跳题库、生成复习卡；单路径必学节点跑通率可统计。
+**边界**：不复制任何题目正文与教程内容，只维护「去哪里学、学到什么算过关」，License 风险局限在外链层。
+
 ## 5. 服务契约
 
 ### 5.1 apps/api（FastAPI）
@@ -140,6 +149,8 @@ JD 匹配度（关键词缺口/经历映射）· 简历押题（与 F3 共享解
 - `POST /api/sessions/{id}/report`：读取 session JSONL → 评分 rubric（结构化输出）→ 落盘
 - `POST /api/resumes/parse`（pypdf → 声明抽取）；`POST /api/repos/{id}/prepare`（备课流水线，Phase G1）
 - 内部工具端点（供 agents 只读工具调用）：`/internal/repos/{id}/file`、`/grep`、`/repomap`、`/wiki/{section}`、`/claims`、`/suspicions`
+- 学习路径（F7，目录只读 + 进度读写）：`GET /api/paths`（总览+进度聚合）· `GET /api/paths/{slug}`（阶段树/节点/内嵌资源/状态）· `PUT /api/paths/{slug}/enroll`（订阅与目标设定，幂等 upsert）· `PUT /api/paths/nodes/{node_id}/progress`（status/note，幂等 upsert）· `GET /api/paths/plan/today`
+- 校准与质检（F7 二期）：**以运维脚本落地，未做成 HTTP 端点**（校准是低频批量作业，不需要常驻 API）——`scripts/backfill_company_freq.py`（面经 → `question_company_evidence` → 回灌 `question_companies.freq`，幂等）· `scripts/recheck_pins.py`（锚点存活复检）· `scripts/verify_f3_interview.py`（F3 长面追问链验收）。证据查询走既有 `GET /api/questions`（companies[].freq）+ evidence 表直接查库。
 - LLM 网关：`complete()` / `complete_structured(schema)`；**显式单 provider，不做模型静默降级**；结构化输出失败→单次带校验错误重试→仍失败抛 `StructuredOutputError`；全部调用记 `llm_calls`（token/延迟/用途）
 
 ### 5.2 apps/agents（Node, pi 运行时）
@@ -149,7 +160,7 @@ JD 匹配度（关键词缺口/经历映射）· 简历押题（与 F3 共享解
 - F4 拷打模式与只读工具在 Phase G1 挂载；未就绪时路由返回显式 501（不做假实现）
 
 ### 5.3 数据模型（核心表，apps/api/alembic 管理）
-users · companies · tags(树) · questions(kind/difficulty/answer_provenance/source/content_hash) · question_tags · question_followups（追问链）· question_companies(频率) · experiences(+items 问题树) · resumes · resume_claims · projects · repo_artifacts · suspicions · interview_sessions · messages · review_cards(SM-2) · mastery · golden_cases · sources(license 门禁) · embeddings(kind/ref/model/Vector) · llm_calls(用量)
+users · companies · tags(树) · questions(kind/difficulty/answer_provenance/source/content_hash) · question_tags · question_followups（追问链）· question_companies(频率) · experiences(+items 问题树) · resumes · resume_claims · projects · repo_artifacts · suspicions · interview_sessions · messages · review_cards(SM-2) · mastery · golden_cases · sources(license 门禁) · embeddings(kind/ref/model/Vector) · llm_calls(用量) · learning_enrollments(路径订阅/目标) · learning_node_progress(节点状态 todo|doing|done|skipped) · question_companies.source('ai' 推断 / 'experience' 面经实证) · question_company_evidence(频率证据，可追溯到具体面经条目，唯一约束 question_id+experience_item_id 保证幂等)
 
 ## 6. Web UI 设计规范（apps/web）
 
@@ -204,6 +215,8 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 | **I1 面试循环** | F3 状态机+追问阶梯+persona、简历解析押题、评分报告、失分点回流；**面试官从题库组卷（含 kind=algorithm 手撕抽题）** | 30 分钟模拟面试+报告达 §4 验收 | ✅ 2026-08-29 全链路实测：组卷 v2（公司频率榜 ∪ 简历考点押题 → LLM 定卷硬校验 + 面经追问素材 + 考察简报）→ agents 题单驱动面试（0.8-1.3s/轮，简报/简历要点/probes 首轮导演指令注入）→ 评分报告（rubric 五维+原话证据）→ 失分点自动回流 SM-2（续九）。简历解析管道 + 开始表单简历选择器已上线 |
 | **G1 项目拷打** | 备课流水线（repomap 移植/cAST/pgvector/wiki/git 归属）、疑点映射、只读工具面、拷打 agent、证据链报告 | 真实 repo 全流程达 §4 验收 | ✅ **v1 全链路落地（2026-08-29/30 续十～十五）**：备课（目录/zip+异步进度）→ 声明质证 → 拷打（架构重心+自动开场+真读码审计+file:line 可点击核证）→ **证据链报告**（评分维度与失分点必带候选人原话/代码位置证据，浏览器渲染引用块+可点击定位，失分点回流 SM-2 保留锚点）。v2 待做：tree-sitter repo map、pgvector 语义检索、git URL 通道与归属分析、Anki 导出 |
 | **L1 学习闭环** | F6 SM-2/掌握度/Anki 导出、F5 简历工作台、Dashboard 完整版 | 失分→复习→掌握度更新闭环 | ✅ 2026-08-30 收官：SM-2 回流+三键评分（续九）→ **掌握度统计**（按标签聚合，失分点带 tags 回流）/ **Anki 导出**（genanki .apkg）/ **JD 匹配度**（简历画像×JD→匹配分/已覆盖/缺口/建议，实测 88/100）/ **Dashboard 完整版**（题库/面经/复习/岗位大类真实统计） |
+| **F7 学习路径** | 四路径目录（L0+应用/算法/开发/手撕，141 资源）· 目录加载校验 · 进度读写 API · `/paths` 总览与 `/paths/{slug}` 详情两个页面 · 侧边栏入口 | 四条路径可浏览可订阅；节点进度刷新保持；节点→题库/复习/拷打三处咬合可用 | ✅ 2026-08-31 收口（续二十三） |
+| **F7 二期（咬合收口）** | 仪表盘学习路径进度卡 · 题库深链 `/bank?tag=` · 锚点复检自动化 · **面经频率榜事实校准**（公司×标签共现 → 回灌 question_companies）· F3 长面试验收脚本 | 进度卡可见真实进度；深链跳转自动筛选；校准后频率榜可追溯到面经条目；重跑幂等；长面追问链可量化 | ✅ 2026-08-31 收口（续二十三） |
 | **P1 公开化** | 多用户、UGC 爆料、语音（LiveKit）、岗位聚合评估 | 按 §10 合规重审 | 未开始 |
 
 **K1 遗留（转入 I1 期间的质量迭代）**：① 存量题标签重打标与 track/厂商回填（进行中：统一分类守护逐批处理，进程见 logs/import-classify.log）；② 厂商标注为 AI 推断（宁缺毋滥 prompt 但通用题易挂大厂），需面经事实对校准频率榜（面经采集器已落地，可从 experiences.items 挖掘公司×题目共现）；③ 导入仍为同步内联执行，超大源建议切 arq 队列（端点语义不变）；④ 牛客/linux.do 采集器——**牛客已落地（续六）**，linux.do 被 Cloudflare 拦截显式失败，待浏览器级方案或人工摘录。
@@ -364,3 +377,146 @@ users · companies · tags(树) · questions(kind/difficulty/answer_provenance/s
 - **linux.do 边界**：新增 `manual-linux-do` 作为人工文本入口。自动 `top.rss` / `latest.rss` 与 JSON 仍受 Cloudflare 403；本轮可见搜索又返回操作频率限制，因此停止重试，不带 Cookie、不做挑战绕过，新增数为 0。
 - **合规补量**：牛客四个已确认话题按 robots 门禁与 8 秒间隔运行 `max_posts=30`，新增 14、重复 9、跳过资料/非面经 7；原样复跑为重复 23、跳过 7、新增 0。
 - **超过 100 条后的页面修复**：读取 API 单页上限为 100。面经页改为按 `offset` 连续取页直至取满 `total`，确保页面、来源 tab 与公司筛选基于完整 106 条，而非只统计最新 100 条；人工摘录下拉同步加入 Reddit 与 linux.do。
+
+## 2026-08-30 续二十二（F7 学习路径板块：调研 → 资源取证 → 结构设计 → 一期落地）
+
+中间调研全部落在 `search/`：`01-学习路径-渠道与方向调研.md`（渠道与方向共识）、`02-学习路径-资源清单.md`（141 条已核验资源，脚本生成）、`03-学习路径-结构与落地设计.md`（数据结构与咬合点）；原始取证数据与脚本在 `search/_raw/`。
+
+### 1. 渠道调研（先定方向，再找资源）
+
+- **linux.do ✅ 可取**：直连与 `search.json` 被 Cloudflare 挑战页拦截（与续六、续二十一同），但**经搜索引擎 site 索引可稳定拿到正文摘要**。取证到的高相关帖子：
+  - [帖 2174720「纯 rag 面试官都有点不感冒」](https://linux.do/t/topic/2174720)——**本轮最有价值的一条**：2026 年「重排/topk/重写」这类纯 RAG 套路面试官已看烂，要的是**选真实场景（运维助手/代码库问答/业务操作助手）+ 基于开源框架改造 + 说清效果怎么验证**。→ 直接写入设计约束 D6：实战节点必须带评测与 badcase 闭环。
+  - [帖 1360644「大模型应用/Agent 开发学习流程与技术栈」](https://linux.do/t/topic/1360644)——社区推荐 `datawhalechina/hello-agents` + `all-in-rag`，并明确付费课非必需。→ 资源策略：**免费开源优先，付费课降级为选修**。
+  - 帖 2706697/2711559/1699553（课程大纲）——反推企业侧技术栈图谱（Coze/Dify/n8n → LangChain/LlamaIndex → LangGraph → MCP），用于校验应用线阶段顺序。
+- **Reddit ⚠️ 本网络完全不可达**：`www/api/old.reddit.com` 的 `.json` 均返回 HTML 壳，redlib 镜像 403，搜索引擎 `allowed_domains` 无结果。**结论：本轮不引用任何 Reddit 帖子的具体内容**（避免编造），社区清单（r/LLMDevs、r/LocalLLaMA、r/MachineLearning、r/cscareerquestions、r/leetcoders）仅作为未来采集源登记为 `unverified`。F1 的 `manual-reddit` 人工摘录通道不受影响（后端不访问 Reddit）。
+- **中文 SEO 站**：5 篇「2026 学习路线」内容阶段划分高度雷同（筑基→原理→实战→进阶→就业）、信息增量≈0。**只用于交叉验证阶段切分，不引用其推荐资源**。
+- **GitHub ✅ 一手取证**：搜索接口 12 组查询聚合 **571 个仓库**完整元数据；核心接口定点核验 **47 个仓库**（补齐 topic 标注不全导致的漏检）。**非 GitHub 链接探测 60 条，56 条可达**；`mlops-zoomcamp.com` 本网络不可达（改用仓库）、`docs.claude.com` agent-sdk 路径 404（已修正）、`hello-algo.com` 429 限流（站点在用）、deeplearning.ai 单课程页 500（同站其余 200，标需复检）。
+
+### 2. 资源清单与合规
+
+- **141 条资源**（必学 51）：L0 前置 5 / 应用 41 / 算法 39 / 开发 30 / 手撕 26。每条带：类型、优先级（必学/选修/参考）、核验数据、`为什么放这` 一句话理由。
+- **数字全部来自接口**，由 `search/_raw/build_inventory.py` 回读取证 JSON 渲染，脚本可重跑复检 —— 杜绝手写 star 数漂移。
+- **License 门禁沿用 §10**：本轮实际排除的 GPL/AGPL 仓库有 `firecrawl`（AGPL）、`khoj`（AGPL）、`Fosowl/agenticSeek`（GPL）、`ashishps1/awesome-leetcode-resources`（GPL）、`xlite-dev/Awesome-LLM-Inference`（GPL）。无 license 的仓库保留但 UI 标注「未标注」。
+- **踩坑记录（值得记一笔）**：arXiv 编号凭记忆写入会张冠李戴——本轮核对标题时抓到两处：`2308.04079` 实为 3D Gaussian Splatting（不是 Self-RAG）、`1910.01108` 实为 DistilBERT（不是 ZeRO）。**所有论文在清单中改为脚本抓取 `citation_title` 回填，不手写标题**。
+
+### 3. 结构设计要点
+
+- **目录不落库**：`paths.json` 进 Git，可 diff 可评审；DB 只存 `learning_enrollments`（订阅/目标）与 `learning_node_progress`（节点状态）。改文案不用写迁移，改状态走 API。
+- **目录加载零降级**：Pydantic 全量校验，含交叉引用检查（节点 stage 必须存在、resource id 必须在资源表、阶段内 order 不重复）；失败抛 `PathsCatalogError`，对齐 §7「禁静默降级」。
+- **节点四件套**：目标 / 产出物 / 验收判据 / 资源。验收判据必须可判定——反例「理解 Transformer」，正例「能徒手写出多头注意力的维度变换并解释 mask 作用」。
+- **节点规模**：26 个阶段、**109 个节点**（L0 5 / 应用 27 / 算法 30 / 开发 23 / 手撕 24）；单节点一般 2–10 小时，超出即拆（整份题单类的 `lc-4-1` 例外，标为长任务）；每节点必学资源 ≤3 条。必学资源引用共 83 次，去重后 51 个不同资源。
+- **咬合点（本板块的价值所在，不新造知识孤岛）**：节点 `related.tags` → F2 题库跳转；节点完成 → 生成 `ReviewItem`（source=`path`）进 F6 SM-2；应用/开发线实战产出物 → 直接送 F4 项目拷打；手撕线题单 ← F1 面经频率榜（后期回灌）。
+- **边界**：不复制题目正文与教程内容，只维护「去哪里学、学到什么算过关」。
+
+### 4. 一期实现
+
+- **API**（`apps/api/src/getoffer/paths/`）：`catalog.py`（Pydantic 加载 + 交叉引用校验 + 进程内缓存）、`router.py`（7 个端点）、`data/`（`paths.json` 路径与阶段、`nodes_{l0,app,algo,dev,lc}.json` 节点、`resources.json` 资源）。
+  端点：`GET /api/paths`、`GET /api/paths/plan/today`、`GET /api/paths/{slug}`、`PUT /api/paths/{slug}/enroll`、`PUT /api/paths/nodes/{node_id}/progress`、`POST /api/paths/nodes/{node_id}/review`（生成复习卡接入 F6）、`GET /api/paths/nodes/{node_id}/resources`。
+  `models.py` 追加 `learning_enrollments` / `learning_node_progress` 两张表（**不改动任何既有表**）；`main.py` 注册路由；`errors.py` 新增 `PathsCatalogError`。
+- **Web**：`/paths` 总览（五张路径卡 + 进度条 + 今日计划）与 `/paths/[slug]` 详情（阶段侧栏 + 节点卡 + 验收勾选 + 资源 chips + 订阅条）；`lib/paths.ts` 承载类型与展示映射；侧边栏新增入口。沿用现有设计令牌与组件，未改动既有页面。
+- **进度语义**：`node_id` 为目录字符串 id 而非外键——目录增删节点不会破坏历史进度。完成度分母剔除 `skipped`，防止「跳过刷进度」。
+- **验收勾选联动**：勾满验收判据即自动置 `done`，取消任一勾则回退到 `doing`；状态按钮可手动覆盖。
+- **资源锚点（pins，二轮迭代）**：节点 `resources` 仍为资源 id 列表，新增 `pins`（资源 id → `{label,url,note}[]`）。加载期两条硬校验：锚点必须挂在已引用资源上、锚点 URL 不得等于资源首页。前端资源卡改为「标题行 + 锚点列表」，每个锚点可点开。**取证链**：GitHub `git/trees` 与 jsdelivr 目录树、文档站 `llms.txt`/`sitemap.xml`，候选路径 raw HEAD 只收 200（`search/_raw/verify_paths.py` 驳回 44 个假设）。结果 **161 锚点 / 失效 0**；论文类资源（arxiv abs）本身即最细粒度，冗余锚点由校验自动剔除。
+- **验证**：`apps/api/scripts/smoke_paths.py` 进程内集成测试 **11/11 通过**（目录 5 路径/26 阶段/109 节点/141 资源、两表建表、完成度分母、订阅与进度 upsert 幂等、复习卡按节点去重、测试数据清理无残留）；web `tsc --noEmit` 零错误、`next build` 通过且 `/paths` 与 `/paths/[slug]` 进入路由表。
+- **构建注意**：本工作台注入的 `NODE_OPTIONS=--use-system-ca` 会让 Turbopack worker 启动失败（`ERR_WORKER_INVALID_EXEC_ARGV`），构建前需 `env -u NODE_OPTIONS`（`start.ps1` 不受影响）。
+- **已知缺口**：题库页当前不读 URL 参数，节点卡里的「相关标签」链接进 `/bank?tag=X` 后需手动点标签筛选。补齐要改 `components/bank/questions-explorer.tsx`（加 `useSearchParams` 初始化），属既有模块改动，**按「不动已实现部分」的约束留到 P2，需你确认后再动**。
+
+### 5. 未决
+
+1. 109 个节点的验收判据需长期维护 → 先保证应用线与手撕线质量，算法/开发线允许阶段性粗粒度。
+2. Reddit 一手内容仍未取证 → 需换网络或浏览器级方案（需用户授权安装无头浏览器）后补采。
+
+## 2026-08-31 续二十三（F7 二期：咬合收口 + 跨模块校准，调研驱动）
+
+承接续二十二的缺口盘点，本轮完成前两个梯队。先给调研结论（直接决定做法，不拍脑袋），再给实现与验收。
+
+### 1. 调研结论（续二十二缺口的数据底座）
+
+- **面经条目 5745，挂公司 3150；题库 22812。** 面经来源分布：字节 889 / 快手 403 / 腾讯 394 / 百度 296 / 阿里 270 / 美团 234 / B站 148 / 小红书 122 / 蚂蚁 103 / 京东 98。
+- **「面经问题 ↔ 题库题干」匹配命中率实测**：归一化精确匹配 **0.92%**、包含匹配 **0.53%**、核心术语命中 **28.4%**。根因：面经问题是口语化追问（「训练时为什么要 mask，推理时也需要吗」），题库题干是规范化表述（「记忆应该存什么」），**形态差异大，字符串匹配根本走不通**。
+  → 结论：频率榜**不能做「题→题」匹配，必须走「公司 × 标签」的考点级共现**，再经题目标签继承回题目。
+- **F3 追问链落盘结构实测**：题单驱动模式（`apps/agents/src/session.ts:201-247`）——追问时 `followUpDepth>0` 且**不换题**（introduceNext=false），换题/打满时归零。落盘 assistant 事件携带 `state: PhaseState`，含 `followUpDepth`。因此验收脚本**无需改 agents**，直接读 JSONL 的 `state.followUpDepth` 序列即可统计追问链。无题单模式同构（`state-machine.ts`）。
+- **已知 UX 缺陷**：题库页 `questions-explorer.tsx` 筛选状态全部 `useState("")` 初始化，不读 URL，导致节点卡「相关标签」跳转后不筛选。
+
+### 2. 本轮实现（前两个梯队）
+
+**第一梯队（F7 咬合收口）**：
+
+- **仪表盘学习路径进度卡**：`/dashboard` 新增一张「学习路径」卡，调 `/api/paths` 聚合各路径完成度/当前节点，链入 `/paths`。纯新增组件，不动既有卡与统计接口。
+- **题库深链 `/bank?tag=&track=&kind=&company=&q=`**：`questions-explorer.tsx` 改为由 `useSearchParams` 初始化筛选状态；`/bank/page.tsx` 以 `<Suspense>` 包裹 explorer（Next 16 静态页要求）。节点卡跳转后即自动命中筛选。
+- **锚点链接复检自动化**：`apps/api/scripts/recheck_pins.py`——周期复检 161 个锚点的存活与 stale 资源（>365 天未推送），输出失效/可疑清单与统计报告，供手动或定时运行，防止链接腐烂。
+
+**第二梯队（跨模块校准）**：
+
+- **面经频率榜事实校准（`ingest/freq_calibration.py`）**：按调研结论走「公司 × 标签」共现——
+  1. 对每条挂公司的面经 item，用术语词典（12 标签族词表 + 技术词表，可从 `qa_extract.TAG_FAMILIES` 派生）打考点标签；未命中条目显式记为 `unmatched`（不编造、不静默丢弃）。
+  2. 聚合为新表 `company_tag_freq(company_id, tag_id, evidence_count, sample_item_ids)`（公司 25 × 标签 ≈ 15 ≈ 375 行，可追溯：每条都指回具体 `experience_item`）。
+     （**规划口径，实际形态见下方「落地记录」**：改为 `question_company_evidence` 逐条证据 + 词级双向匹配，非标签代理）
+  3. 回灌 `question_companies`：`freq = 1（AI 推断基础） + Σ(该题各标签在该公司命中的 evidence_count)`；新增列 `evidence_count` / `calibrated_at` 标注校准来源与时间，幂等可重跑（以 tag 频次的确定性函数重写，重跑不产生重复）。
+  → 让 F2 验收「频率榜可追溯到面经条目」成立；同时解锁 F7 手撕题单回灌与 I1 组卷的「公司频率榜」数据源。
+- **F3 长面试验收脚本（`scripts/verify_long_interview.py`）**：统计逻辑（纯函数，读 JSONL `state.followUpDepth` 序列 → 追问链条数/最大深度/密度）+ 驱动逻辑（经 agents API 自动跑 N 轮模拟面试）。先在既有会话上回归统计函数，再以中等轮数实测追问链产出，对照「≥8 条追问链」给出通过/未达标结论。
+
+**验收**：
+- 仪表盘进度卡渲染各路径真实进度；题库深链跳转后标签自动筛选。
+- `recheck_pins.py` 输出 161 锚点报告，失效与可疑分类明确。
+- `company_tag_freq` 行数 > 0；抽样任一 (公司, 标签) 可指回 ≥1 条具体面经条目；`question_companies.freq` 不再全为 1；重跑幂等。
+- `verify_long_interview.py` 对既有会话统计正确；实测轮次产出追问链数量可量化。
+3. 资源过期：只标 `stale`（>12 个月未推送）提示，不自动下架，避免误杀经典但低频更新的项目。
+
+### 3. 落地记录（2026-08-31 实际交付，与上表规划的差异说明）
+
+**频率榜校准（规划 `ingest/freq_calibration.py` + `company_tag_freq` 表 → 实际 `scripts/backfill_company_freq.py` + `question_company_evidence` 表）**：
+
+- 数据底座：面经条目 5745、挂公司 3150；题库 22812。
+- ~~初版走「标签级代理」：面经命中标签即关联该标签下全部题~~ → **2026-09-01 验收后废弃，见下方「算法修正」**。
+- 证据链：面经条目文本命中词 → 映射题库题 → 落 `question_company_evidence(question_id, company_id, experience_id, experience_item_id, score)`，唯一约束 `(question_id, experience_item_id)` 保证**重跑幂等**（实测重跑 0 变化）。
+- 回灌：`freq(C,q) = max(已有 AI 推断值, 实证独立条目数)`；`question_companies` 增 `source` 列（`ai` 推断 / `experience` 实证），有实证即标 `experience`——实证不被推断覆盖，推断兜底不丢。
+- 迁移：`question_companies` 加 `source` 列 + 新建 evidence 表（幂等 SQL，服务重启 `create_all` 不覆盖既有表，需本脚本先行补列——已执行）。
+
+#### 算法修正（2026-09-01 验收发现并修复，**重要**）
+
+初版「标签级代理」经端到端验收被证伪，问题不是精度偏低而是**系统性错误**：
+
+| 症状 | 实测 |
+|---|---|
+| 摊薄 | company_id=3 下 **1293 道题共享同一 freq=2**，区分度为零 |
+| 语义错误 | 「卷积操作参数」这道题的证据是「二叉树层序遍历」「合并重叠区间」——面经提到「手撕代码」就给全部 429 道算法题 +1 |
+
+数字看似精确实为假象，**比原先的 AI 推断值更误导**。根因：标签代理把「同标签」当成「同考点」。
+
+修正为**词级双向匹配**——要求**题干本身也包含同一个词**才关联：
+
+- 词表 147 词（题库 canonical 标签 + 技术术语），建题干倒排索引；
+- 关联条件：`W(面经条目) ∩ W(题干) ≠ ∅`，且 score（IDF 加权覆盖度）≥ 0.30；
+- **扇出门槛**：交集中「最窄的那个词」若仍对应 >150 题则跳过（宽词需 ≥2 个共现词支撑）；
+- **通用词黑名单**：剔除「并发/线程/优化/设计/实现/数据/模型」等 40+ 个低区分度词——它们共现不代表同一考点（如「并发」会让「Agent 线程安全」关联到「asyncio 高并发」）。
+
+修正后实测：证据 **55,308 行**、(公司,题) 对 **21,809**；source 分布 experience 21,809 / ai 26,585。
+语义抽查：「岛屿数量」→ 4 道岛屿题（score 1.0）；「卷积操作」→ **0 证据**（不再被手撕题污染）；「Agent 瓶颈」→ LangChain/LCEL 题（score 1.0，弱相关的 asyncio 证据已剔除）。
+字节跳动实证高频：GRPO 奖励设计 26 次、RAG chunk 25 次，证据均可下钻到 nowcoder 原文。
+
+**副作用（诚实记录）**：`--reset` 会把 `source='experience'` 的行重置为 `freq=1`，而初版已用 `max()` 覆盖了部分原 AI 推断值，**这部分原值无法恢复**（丢失的是 1–3 的小数字，且 AI 推断值本身质量存疑）。
+
+#### 顺带修掉的深链哑火
+
+验收还发现节点 `related.tags` 里有 **43 处**用了非 canonical 简称——「手撕」（应为「手撕代码」）21 处、「训练微调」（应为「训练与微调」）22 处。这两类标签在题库里不存在，`/bank?tag=X` 深链会**静默筛出 0 题**。已全量修正，并在 `catalog.py` 加载校验新增标签白名单（`ALLOWED_NODE_TAGS`，canonical + 岗位大类），负向测试确认能拦截。
+
+**F3 长面验收（规划 `scripts/verify_long_interview.py` → 实际 `scripts/verify_f3_interview.py`）**：
+
+- 追问链口径：assistant 事件 `state.followUpDepth` 增长次数 = 新开一条链；换题归零。时长 = JSONL 首尾 ts 差。
+- 实测 41 场历史会话：**全为短面（0–3.8 分钟），0 场达标**——与「只跑过 5 轮短面」事实一致，验收脚本让 F3「从未实测」变为可量化。
+- `--drive` 模式可拉起新长面：题库按实证 freq 取 TOP8 题（GRPO/DPO/PPO 家族 + 手撕 PPO）→ POST agents `/sessions` → 轮询 `GET /sessions/{id}` 至 finished → 统计验收（需 agents 服务与 LLM key，未实际跑完 30 分钟长面，留待用户实测）。
+
+**锚点复检**：`scripts/recheck_pins.py` 报告落 `data/pin_recheck_report.json`；实测 161 锚点 **0 明确失效**、10 可疑（HF 直连不稳 / OpenAI 站 403 反爬，路径本身已核验）、12 个 >365 天陈旧资源正确标记。
+
+**未动既有模块**：题库深链仅改 `questions-explorer.tsx` 初始化方式（`useSearchParams` + Suspense 边界已在 `bank/page.tsx`）；`models.py` 仅追加 evidence 表与 `source` 列定义；仪表盘为纯新增组件。
+
+## 2026-08-31 续二十三（面经公开目录扩充至 500+）
+
+- **结果**：面经由 106 条扩充至 **503 条**，共 5671 个主问题、74 个追问；新增 397 条。最终来源分布为：牛客既有 30、CSDN 11、小红书 24、抖音 22、知乎 25、Reddit 9、牛客公开目录 278、GitHub EasyOffer 21、博客园 39、GeeksforGeeks 27、linux.do 17。
+- **公开目录采集**：新增 `nowcoder-public`、`github-easy-offer`、`cnblogs`、`geeksforgeeks` 四个自动来源并扩充 CSDN。所有 HTTP 请求继续经过 `PoliteClient` 与 robots 门禁；牛客最小间隔 8 秒，CSDN/博客园/GeeksforGeeks 12 秒；目录发现最多 30 页、单次导入最多 30 条，带原子检查点和失败重试。登录墙、Cloudflare、robots 拒绝均显式停止，不接 Cookie、隐藏接口或挑战绕过。
+- **批量语义**：新增批量抽取 schema 和审核账本，但复用原有单条入库器、公司匹配、问题树、`content_hash` 与幂等逻辑。一位候选人的一次多轮流程只算一条；仅在来源正文存在明确公司章节时拆分，禁止按轮次、问题、图片或分页凑数。每个问题必须可在原文中逐字定位，孤立标题、泛主题词、截断句和无具体问题的总结不入库。
+- **人工补源**：linux.do 与 Reddit 使用纯人工摘录通道，后端不请求原站；小红书、抖音、知乎继续使用用户登录后的可见浏览器低频核验，没有落地无人值守采集器。新增 linux.do 17 条、Reddit 7 条，均保留溯源 URL；没有从搜索摘要或站内 AI 摘要编造问题。
+- **质量审计**：三轮复核共隔离 24 条混合多公司、无效、泛化、截断或语义重复候选。最终 503 个 ID 全部唯一、每条至少 1 个问题；本轮新增记录不存在跨来源 URL 重复。全库仅剩一组既有历史候选重复（旧 id 7/9），未越权改动旧数据。原始快照和隔离备份只保留在本地 `data/collection500/`，不提交完整第三方正文。
+- **验收**：同源 API 分页实测 `total=503`、加载 503、唯一 ID 503、含问题 503；`/experiences` 返回 200。后端 **55 项 pytest**、ruff、py_compile、前端 TypeScript 全部通过；EasyOffer、博客园、GeeksforGeeks 原样重放均只报告重复、`inserted=0`，重启后幂等成立。
+- **持续边界**：发布日期不等于面试日期，来源未明示时不推断；单条最多保留 30 个可核验主问题；后续扩量仍必须满足“真实候选人 + 明确场景 + 具体问题”，不收题库、课程笔记、资料广告、岗位 JD 或无问题正文的经验总结。

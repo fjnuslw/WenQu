@@ -4,6 +4,7 @@ import { ArrowRight, BookOpenCheck, Layers, MessagesSquare, Newspaper, RotateCcw
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { LearningProgress } from "@/components/paths/learning-progress";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ const MODULES = [
   {
     href: "/interview",
     title: "模拟面试",
-    desc: "简历押题组卷 + 七阶段状态机 + 评分报告回流复习",
+    desc: "简历证据化深挖 + 七阶段状态机 + 评分报告回流复习",
     icon: MessagesSquare,
     tint: "text-warn bg-warn/10",
     status: "I1",
@@ -112,6 +113,9 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* F7 学习路径进度：与今日复习并列，回答「学到哪 / 下一步 / 还要多久」 */}
+      <LearningProgress />
 
       <Card className="mt-6">
         <CardHeader>

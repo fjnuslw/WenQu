@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, Code2, ExternalLink, Inbox, Info, Link as LinkIcon, MessageCircleQuestion, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Code2, ExternalLink, Inbox, Info, Link as LinkIcon, MessageCircleQuestion, RefreshCw, Route as RouteIcon, Search, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { CompanyLogo } from "@/components/company-logo";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,15 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { agentsUrl, apiFetch, ApiError } from "@/lib/api";
 import { KIND_LABELS } from "@/lib/tags";
 import { cn } from "@/lib/utils";
+
+/** 深链来源上下文：记录「从哪个页面带着什么筛选进来」，仅挂载时取一次。 */
+interface DeepLinkOrigin {
+  from: string;
+  node: string | null;
+  slug: string | null;
+  title: string | null;
+  tag: string | null;
+}
 
 interface CompanyItem {
   id: number;
@@ -57,6 +67,14 @@ interface Stats {
 
 const TRACKS = ["大模型应用", "大模型算法", "大模型应用算法", "视觉算法", "通用基础"] as const;
 const PAGE_SIZES = [20, 50, 100] as const;
+
+/**
+ * URL 参数是用户可编辑的，直接喂给筛选会打崩请求或静默无结果：
+ * 岗位与题型做白名单校验，非法值一律回落为「不限」而非报错。
+ */
+function sanitizeEnum(raw: string | null, allowed: readonly string[]): string {
+  return raw && allowed.includes(raw) ? raw : "";
+}
 
 const TRACK_CLASS: Record<string, string> = {
   大模型应用: "border-accent/40 bg-accent-soft text-accent",
@@ -138,20 +156,111 @@ interface ListState {
 
 const INITIAL_LIST: ListState = { items: [], total: 0, isFetching: false, loaded: false, error: null };
 
+/**
+ * 深链来源条：从学习路径节点等入口跳转进来时，说明「你为什么看到这批题」，
+ * 并给一条回程路径。没有它，用户会以为自己误入了随机筛选结果。
+ */
+function DeepLinkBanner({
+  origin,
+  onDismiss,
+  onClear,
+}: {
+  origin: DeepLinkOrigin;
+  onDismiss: () => void;
+  onClear: () => void;
+}) {
+  const backHref = origin.slug ? `/paths/${origin.slug}${origin.node ? `#${origin.node}` : ""}` : null;
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-accent/25 bg-surface-2/60">
+      {/* 左侧光带：与主题背景的 radial glow 呼应，区别于普通卡片 */}
+      <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b from-accent-strong via-accent to-accent-violet" />
+      <div className="flex items-center gap-3 py-3 pl-4 pr-3">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-accent/25 bg-accent-soft text-accent">
+          <RouteIcon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+            来自学习路径
+          </p>
+          <p className="truncate text-sm text-ink">
+            {origin.title ?? "相关题目"}
+            {origin.tag && (
+              <span className="ml-2 text-xs text-ink-dim">
+                · 已按标签「{origin.tag}」筛选
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {backHref && (
+            <Link
+              href={backHref}
+              className="inline-flex items-center gap-1 rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim transition-colors hover:border-accent hover:text-accent"
+            >
+              <ArrowLeft className="size-3" />
+              回到节点
+            </Link>
+          )}
+          <button
+            onClick={onClear}
+            className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+          >
+            清除筛选
+          </button>
+          <button
+            onClick={onDismiss}
+            aria-label="关闭来源提示"
+            className="grid size-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface hover:text-ink"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function QuestionsExplorer() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [list, setList] = useState<ListState>(INITIAL_LIST);
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [company, setCompany] = useState("");
-  const [track, setTrack] = useState("");
-  const [kind, setKind] = useState("");
-  const [tag, setTag] = useState("");
-  const [queryInput, setQueryInput] = useState("");
+  // 深链初始化：学习路径节点等入口用 /bank?tag=X 直达，进页面即已筛选
+  const [company, setCompany] = useState(() => searchParams.get("company") ?? "");
+  const [track, setTrack] = useState(() => sanitizeEnum(searchParams.get("track"), TRACKS));
+  const [kind, setKind] = useState(() => sanitizeEnum(searchParams.get("kind"), Object.keys(KIND_LABELS)));
+  const [tag, setTag] = useState(() => searchParams.get("tag") ?? "");
+  const [queryInput, setQueryInput] = useState(() => searchParams.get("q") ?? "");
   const query = useDebouncedValue(queryInput, 300); // 防抖：只有停顿才触发请求
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(20);
   const [askingId, setAskingId] = useState<number | null>(null);
+  // 来源上下文只在挂载时取一次：后续筛选变化会改写 URL，但不能把「我从哪来」冲掉
+  const [origin, setOrigin] = useState<DeepLinkOrigin | null>(() => {
+    const from = searchParams.get("from");
+    if (!from) return null;
+    return {
+      from,
+      node: searchParams.get("node"),
+      slug: searchParams.get("slug"),
+      title: searchParams.get("title"),
+      tag: searchParams.get("tag"),
+    };
+  });
+
+  // 筛选状态回写 URL：当前视图可分享、可刷新保持、可前进后退
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (company) params.set("company", company);
+    if (track) params.set("track", track);
+    if (kind) params.set("kind", kind);
+    if (tag) params.set("tag", tag);
+    if (query) params.set("q", query);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [company, track, kind, tag, query, pathname, router]);
 
   useEffect(() => {
     apiFetch<{ items: CompanyItem[] }>("/api/companies")
@@ -242,18 +351,34 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
   }).filter((value) => value >= 1 && value <= totalPages);
 
   // 标签 chips 由真实计数驱动（归一后的 canonical 名）；只截掉尾部低频杂项（spec 续二十）
-  const tagEntries = stats
+  const tagEntries: [string, number][] = stats
     ? Object.entries(stats.by_tag)
         .filter(([, count]) => count >= 20)
         .sort((a, b) => b[1] - a[1])
     : [];
+  // 深链进来的标签可能是低频词，被上面 ≥20 的阈值截掉就看不到「选中态」了，强制插到最前
+  const tagChips: [string, number][] =
+    tag && !tagEntries.some(([name]) => name === tag)
+      ? [[tag, stats?.by_tag[tag] ?? 0], ...tagEntries]
+      : tagEntries;
 
   const showEmpty = list.loaded && !list.error && list.items.length === 0;
   // 当前选中公司的官方网申入口（题库页直达投递，spec 续十九）
   const activeCareer = company ? companies.find((item) => item.name === company) : undefined;
+  const hasFilters = Boolean(company || track || kind || tag || query);
+  const activeFilterCount = [company, track, kind, tag, query].filter(Boolean).length;
 
   return (
     <div className="space-y-4">
+      {origin && <DeepLinkBanner origin={origin} onDismiss={() => setOrigin(null)} onClear={() => {
+        setOrigin(null);
+        setCompany("");
+        setTrack("");
+        setKind("");
+        setTag("");
+        setQueryInput("");
+      }} />}
+
       {/* 搜索置顶：体感最关键的入口 */}
       <Card className="p-3">
         <div className="relative">
@@ -376,8 +501,8 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <FacetLabel text="标签" />
-          {tagEntries.length === 0 && <span className="text-[11px] text-ink-faint">统计加载中…</span>}
-          {tagEntries.map(([name, count]) => (
+          {tagChips.length === 0 && <span className="text-[11px] text-ink-faint">统计加载中…</span>}
+          {tagChips.map(([name, count]) => (
             <Badge
               key={name}
               variant={tag === name ? "accent" : "default"}
@@ -407,6 +532,20 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
         <Card className="p-10 text-center">
           <Inbox className="mx-auto mb-3 size-6 text-ink-faint" />
           <p className="text-sm text-ink-dim">当前筛选没有题目 —— 试试放宽条件，或等待后台导入。</p>
+          {hasFilters && (
+            <button
+              onClick={() => {
+                setCompany("");
+                setTrack("");
+                setKind("");
+                setTag("");
+                setQueryInput("");
+              }}
+              className="mt-3 rounded-md border border-line px-4 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+            >
+              清除 {activeFilterCount} 项筛选
+            </button>
+          )}
         </Card>
       )}
       {list.items.length > 0 && (
@@ -414,6 +553,22 @@ ${question.stem.slice(0, 100)}${question.stem.length > 100 ? "…" : ""}`,
           <div className="flex items-center justify-between text-xs text-ink-dim">
             <span className="flex items-center gap-3">
               共 {total} 题
+              {hasFilters && (
+                <button
+                  onClick={() => {
+                    setCompany("");
+                    setTrack("");
+                    setKind("");
+                    setTag("");
+                    setQueryInput("");
+                  }}
+                  className="inline-flex items-center gap-1 text-ink-faint transition-colors hover:text-ink"
+                  title="清空当前所有筛选条件"
+                >
+                  <X className="size-3" />
+                  清除 {activeFilterCount} 项筛选
+                </button>
+              )}
               {activeCareer?.career_url && (
                 <a
                   href={activeCareer.career_url}

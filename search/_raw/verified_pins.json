@@ -1,0 +1,678 @@
+{
+ "ok": [
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_computational_complexity/index.md",
+   "label": "复杂度",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_computational_complexity/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_array_and_linkedlist/index.md",
+   "label": "数组链表",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_array_and_linkedlist/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_stack_and_queue/index.md",
+   "label": "栈队列",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_stack_and_queue/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_hashing/index.md",
+   "label": "哈希",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_hashing/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_tree/index.md",
+   "label": "树",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_tree/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_heap/index.md",
+   "label": "堆",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_heap/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_searching/index.md",
+   "label": "查找",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_searching/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_sorting/index.md",
+   "label": "排序",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_sorting/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_dynamic_programming/index.md",
+   "label": "动态规划",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_dynamic_programming/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_greedy/index.md",
+   "label": "贪心",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_greedy/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_backtracking/index.md",
+   "label": "回溯",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_backtracking/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_graph/index.md",
+   "label": "图",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_graph/index.md"
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_divide_and_conquer/index.md",
+   "label": "分治",
+   "status": 200,
+   "url": "https://github.com/krahets/hello-algo/blob/main/docs/chapter_divide_and_conquer/index.md"
+  },
+  {
+   "repo": "huggingface/trl",
+   "branch": "main",
+   "path": "docs/source/dpo_trainer.md",
+   "label": "DPO Trainer",
+   "status": 200,
+   "url": "https://github.com/huggingface/trl/blob/main/docs/source/dpo_trainer.md"
+  },
+  {
+   "repo": "huggingface/trl",
+   "branch": "main",
+   "path": "docs/source/sft_trainer.md",
+   "label": "SFT Trainer",
+   "status": 200,
+   "url": "https://github.com/huggingface/trl/blob/main/docs/source/sft_trainer.md"
+  },
+  {
+   "repo": "huggingface/trl",
+   "branch": "main",
+   "path": "docs/source/grpo_trainer.md",
+   "label": "GRPO Trainer",
+   "status": 200,
+   "url": "https://github.com/huggingface/trl/blob/main/docs/source/grpo_trainer.md"
+  },
+  {
+   "repo": "huggingface/trl",
+   "branch": "main",
+   "path": "docs/source/ppo_trainer.md",
+   "label": "PPO Trainer",
+   "status": 200,
+   "url": "https://github.com/huggingface/trl/blob/main/docs/source/ppo_trainer.md"
+  },
+  {
+   "repo": "karpathy/nanoGPT",
+   "branch": "master",
+   "path": "model.py",
+   "label": "GPT 模型定义",
+   "status": 200,
+   "url": "https://github.com/karpathy/nanoGPT/blob/master/model.py"
+  },
+  {
+   "repo": "karpathy/nanoGPT",
+   "branch": "master",
+   "path": "train.py",
+   "label": "训练脚本",
+   "status": 200,
+   "url": "https://github.com/karpathy/nanoGPT/blob/master/train.py"
+  },
+  {
+   "repo": "karpathy/nanoGPT",
+   "branch": "master",
+   "path": "README.md",
+   "label": "总览",
+   "status": 200,
+   "url": "https://github.com/karpathy/nanoGPT/blob/master/README.md"
+  },
+  {
+   "repo": "karpathy/minbpe",
+   "branch": "master",
+   "path": "minbpe/basic.py",
+   "label": "BPE 基础实现",
+   "status": 200,
+   "url": "https://github.com/karpathy/minbpe/blob/master/minbpe/basic.py"
+  },
+  {
+   "repo": "karpathy/minbpe",
+   "branch": "master",
+   "path": "minbpe/gpt4.py",
+   "label": "GPT4 分词",
+   "status": 200,
+   "url": "https://github.com/karpathy/minbpe/blob/master/minbpe/gpt4.py"
+  },
+  {
+   "repo": "karpathy/minbpe",
+   "branch": "master",
+   "path": "minbpe/base.py",
+   "label": "分词器基类",
+   "status": 200,
+   "url": "https://github.com/karpathy/minbpe/blob/master/minbpe/base.py"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch02/01_main-chapter-code/ch02.ipynb",
+   "label": "第2章 文本处理",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch02/01_main-chapter-code/ch02.ipynb"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch03/01_main-chapter-code/ch03.ipynb",
+   "label": "第3章 注意力",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch03/01_main-chapter-code/ch03.ipynb"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch04/01_main-chapter-code/ch04.ipynb",
+   "label": "第4章 GPT 实现",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch04/01_main-chapter-code/ch04.ipynb"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch05/01_main-chapter-code/ch05.ipynb",
+   "label": "第5章 预训练",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch05/01_main-chapter-code/ch05.ipynb"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch06/01_main-chapter-code/ch06.ipynb",
+   "label": "第6章 微调",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch06/01_main-chapter-code/ch06.ipynb"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch07/01_main-chapter-code/ch07.ipynb",
+   "label": "第7章 指令微调",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch07/01_main-chapter-code/ch07.ipynb"
+  },
+  {
+   "repo": "rasbt/LLMs-from-scratch",
+   "branch": "main",
+   "path": "ch02/02_bonus_bytepair-encoder/bpe_openai_gpt2.py",
+   "label": "BPE 实现",
+   "status": 200,
+   "url": "https://github.com/rasbt/LLMs-from-scratch/blob/main/ch02/02_bonus_bytepair-encoder/bpe_openai_gpt2.py"
+  },
+  {
+   "repo": "vllm-project/vllm",
+   "branch": "main",
+   "path": "docs/features/structured_outputs.md",
+   "label": "结构化输出",
+   "status": 200,
+   "url": "https://github.com/vllm-project/vllm/blob/main/docs/features/structured_outputs.md"
+  },
+  {
+   "repo": "vllm-project/vllm",
+   "branch": "main",
+   "path": "benchmarks/README.md",
+   "label": "压测",
+   "status": 200,
+   "url": "https://github.com/vllm-project/vllm/blob/main/benchmarks/README.md"
+  },
+  {
+   "repo": "deepspeedai/DeepSpeed",
+   "branch": "master",
+   "path": "docs/_pages/config-json.md",
+   "label": "配置",
+   "status": 200,
+   "url": "https://github.com/deepspeedai/DeepSpeed/blob/master/docs/_pages/config-json.md"
+  },
+  {
+   "repo": "huggingface/picotron",
+   "branch": "main",
+   "path": "README.md",
+   "label": "总览",
+   "status": 200,
+   "url": "https://github.com/huggingface/picotron/blob/main/README.md"
+  },
+  {
+   "repo": "huggingface/picotron",
+   "branch": "main",
+   "path": "train.py",
+   "label": "训练脚本",
+   "status": 200,
+   "url": "https://github.com/huggingface/picotron/blob/main/train.py"
+  },
+  {
+   "repo": "stas00/ml-engineering",
+   "branch": "master",
+   "path": "README.md",
+   "label": "总览",
+   "status": 200,
+   "url": "https://github.com/stas00/ml-engineering/blob/master/README.md"
+  },
+  {
+   "repo": "stas00/ml-engineering",
+   "branch": "master",
+   "path": "training/README.md",
+   "label": "训练篇",
+   "status": 200,
+   "url": "https://github.com/stas00/ml-engineering/blob/master/training/README.md"
+  },
+  {
+   "repo": "stas00/ml-engineering",
+   "branch": "master",
+   "path": "compute/README.md",
+   "label": "算力篇",
+   "status": 200,
+   "url": "https://github.com/stas00/ml-engineering/blob/master/compute/README.md"
+  },
+  {
+   "repo": "stas00/ml-engineering",
+   "branch": "master",
+   "path": "debug/README.md",
+   "label": "调试篇",
+   "status": 200,
+   "url": "https://github.com/stas00/ml-engineering/blob/master/debug/README.md"
+  },
+  {
+   "repo": "GokuMohandas/Made-With-ML",
+   "branch": "main",
+   "path": "README.md",
+   "label": "总览",
+   "status": 200,
+   "url": "https://github.com/GokuMohandas/Made-With-ML/blob/main/README.md"
+  }
+ ],
+ "rejected": [
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_string/index.md",
+   "label": "字符串",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "krahets/hello-algo",
+   "branch": "main",
+   "path": "docs/chapter_bit_operation/index.md",
+   "label": "位运算",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/getting_started/starter_example.md",
+   "label": "最小 RAG",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/getting_started/installation.md",
+   "label": "安装",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/getting_started/concepts.md",
+   "label": "核心概念",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/optimizing/production_rag.md",
+   "label": "生产级 RAG",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/optimizing/basic_strategy.md",
+   "label": "RAG 优化基础",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/optimizing/advanced_retrieval/optimization.md",
+   "label": "高级检索",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/module_guides/indexing/index.md",
+   "label": "索引",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/module_guides/loading/documents_and_nodes/index.md",
+   "label": "文档与节点",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "run-llama/llama_index",
+   "branch": "main",
+   "path": "docs/docs/module_guides/evaluating/index.md",
+   "label": "评测",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/index.md",
+   "label": "总览",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/concepts/low_level.md",
+   "label": "底层概念",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/concepts/agentic_concepts.md",
+   "label": "Agent 概念",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/concepts/persistence.md",
+   "label": "持久化",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/concepts/human_in_the_loop.md",
+   "label": "人在回路",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/concepts/memory.md",
+   "label": "记忆",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/concepts/multi_agent.md",
+   "label": "多智能体",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/tutorials/introduction.md",
+   "label": "入门教程",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "langchain-ai/langgraph",
+   "branch": "main",
+   "path": "docs/docs/how-tos/index.md",
+   "label": "how-to 索引",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter1/index.md",
+   "label": "第1章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter2/index.md",
+   "label": "第2章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter3/index.md",
+   "label": "第3章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter4/index.md",
+   "label": "第4章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter5/index.md",
+   "label": "第5章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter6/index.md",
+   "label": "第6章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter7/index.md",
+   "label": "第7章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "datawhalechina/hello-agents",
+   "branch": "main",
+   "path": "docs/chapter8/index.md",
+   "label": "第8章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "huggingface/peft",
+   "branch": "main",
+   "path": "examples/lora_dreambooth/README.md",
+   "label": "LoRA 示例",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "huggingface/peft",
+   "branch": "main",
+   "path": "examples/qlora/README.md",
+   "label": "QLoRA 示例",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "huggingface/peft",
+   "branch": "main",
+   "path": "docs/source/conceptual_guides/lora.md",
+   "label": "LoRA 概念",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "huggingface/peft",
+   "branch": "main",
+   "path": "docs/source/conceptual_guides/adapter.md",
+   "label": "Adapter 概念",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "jingyaogong/minimind",
+   "branch": "main",
+   "path": "README.md",
+   "label": "总览",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "jingyaogong/minimind",
+   "branch": "main",
+   "path": "train_pretrain.py",
+   "label": "预训练脚本",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "jingyaogong/minimind",
+   "branch": "main",
+   "path": "train_full_sft.py",
+   "label": "SFT 脚本",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "jingyaogong/minimind",
+   "branch": "main",
+   "path": "model/model_minimind.py",
+   "label": "模型定义",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "rasbt/reasoning-from-scratch",
+   "branch": "main",
+   "path": "ch02/01_main-chapter-code/ch02.ipynb",
+   "label": "第2章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "rasbt/reasoning-from-scratch",
+   "branch": "main",
+   "path": "ch03/01_main-chapter-code/ch03.ipynb",
+   "label": "第3章",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "vllm-project/vllm",
+   "branch": "main",
+   "path": "docs/optimization.md",
+   "label": "优化文档",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "vllm-project/vllm",
+   "branch": "main",
+   "path": "docs/quantization/README.md",
+   "label": "量化",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "deepspeedai/DeepSpeed",
+   "branch": "master",
+   "path": "docs/_pages/zero3.md",
+   "label": "ZeRO-3",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "deepspeedai/DeepSpeed",
+   "branch": "master",
+   "path": "docs/_pages/getting-started.md",
+   "label": "入门",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "huggingface/picotron",
+   "branch": "main",
+   "path": "picotron/models/llama.py",
+   "label": "模型实现",
+   "status": 404,
+   "url": null
+  },
+  {
+   "repo": "GokuMohandas/Made-With-ML",
+   "branch": "main",
+   "path": "lessons/README.md",
+   "label": "课程索引",
+   "status": 404,
+   "url": null
+  }
+ ]
+}
