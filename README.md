@@ -17,100 +17,83 @@
   <a href="apps/api/evals/g1-repository-intelligence-baseline.json"><img src="https://img.shields.io/badge/repo_intelligence-v2-46c7f2" alt="Repository Intelligence v2" /></a>
 </p>
 
-## 为什么做问渠
+## 产品定位
 
-多数面试工具只解决一个局部问题：背题、聊天或简历打分。问渠更关心一次训练能不能留下可复用的证据：
+问渠以候选人的简历、目标岗位和真实项目为上下文，提供从知识准备到面试复盘的完整训练闭环。
 
-- **问题必须针对你。** 先读简历里的实习、项目与量化声明，再结合目标公司面经和高频题组卷。
-- **追问必须落到事实。** 项目拷打可按需打开真实仓库，用 repo map、语义检索、Git 归属和 `文件:行号` 核证。
-- **结果必须进入下一轮。** 评分报告把具体失分点回流到 SM-2，而不是给一个看完就丢的总分。
-- **模块必须能独立进化。** Knowledge / Resume / Interview / Repository / Review 通过窄契约协作，任何模块都能单独替换、评测和优化。
+- 简历证据与岗位要求共同驱动组卷和追问。
+- 代码、原话与评分结论均可定位、可核验。
+- Knowledge、Resume、Interview、Repository、Review 模块通过窄契约协作，可独立替换与优化。
 
-## 一张图看懂能力闭环
+## 能力架构
 
 <p align="center">
   <img src="docs/assets/wenqu-architecture.png" alt="问渠从输入事实、编排证据到输出增长的三层能力闭环" width="100%" />
 </p>
 
-## 当前版本：真实任务演示
+## 产品演示
 
-下列图片均在 **2026-09-03** 使用当前生产构建重新操作并截取，以 1920 CSS 视口和 2× 设备像素比直接渲染为 **3840×2136 无损 PNG**；不放大旧图，也不复用旧界面。每张图单独全宽展示，点击图片可查看原始分辨率。简历与复习模块启用了 `?showcase=1`，只显示仓库生成的合成候选人、合成 JD 和合成失分卡。
+演示环境使用合成候选人、简历、岗位描述与训练记录。
 
-### 1. 工作台：先知道今天该做什么
-
-**任务示例：** 打开平台后同时确认题库规模、面经覆盖、今日复习量与五条学习路径，再从一个明确入口开始训练。
+### 1. 统一工作台
 
 <p align="center">
   <a href="docs/screenshots/hd/01-dashboard.png"><img src="docs/screenshots/hd/01-dashboard.png" alt="问渠工作台：题库、面经、复习和学习路径总览" width="100%" /></a>
 </p>
 
-工作台不是导航页拼盘：它汇总题库与面经统计、SM-2 到期状态和路径进度，把“现在该做什么”放在首屏。
+<p align="center"><sub>题库、面经、复习任务与学习路径统一总览</sub></p>
 
-### 2. 学习路径：每个节点都有产出物和验收判据
-
-**任务示例：** 完成“大模型应用 / 调用与提示”的第一个节点——对 5 组输入统计 token、首字延迟、总耗时和费用，并用 3 组 temperature 做对照实验。
+### 2. 学习路径
 
 <p align="center">
   <a href="docs/screenshots/hd/02-learning-task.png"><img src="docs/screenshots/hd/02-learning-task.png" alt="大模型应用学习路径中的具体任务、资源锚点和验收判据" width="100%" /></a>
 </p>
 
-五条路径共 109 个节点、141 个已核验资源；节点包含目的、预计工时、产出物、逐项验收和可直达题库的考点标签，而不是一份链接收藏夹。
+<p align="center"><sub>109 个任务节点与 141 个已核验资源，覆盖产出物、验收标准和掌握进度</sub></p>
 
-### 3. 题库与答题助手：从 2.2 万道题缩到当前考点
-
-**任务示例：** 用 `RAG` 标签从 22,812 道题中筛出 2,521 道，再进入“问助手”，获得面试口头版、原理展开、公式、易错点和可能追问。
+### 3. 题库与答题助手
 
 <p align="center">
   <a href="docs/screenshots/hd/03-question-bank-rag.png"><img src="docs/screenshots/hd/03-question-bank-rag.png" alt="RAG 题库筛选结果" width="100%" /></a>
 </p>
 
-<p align="center"><sub>厂商 / 岗位 / 题型 / 标签联合筛选，保留来源</sub></p>
+<p align="center"><sub>按公司、岗位、题型和标签联合筛选，保留来源</sub></p>
 
 <p align="center">
   <a href="docs/screenshots/hd/04-question-assistant.png"><img src="docs/screenshots/hd/04-question-assistant.png" alt="题库 AI 解答助手" width="100%" /></a>
 </p>
 
-<p align="center"><sub>口头版 → 原理 → 公式 → 追问，不只给标准答案</sub></p>
+<p align="center"><sub>面试口述、原理、公式与追问一体化生成</sub></p>
 
-### 4. 结构化面经：看真实轮次如何追问项目
-
-**任务示例：** 筛选“美团”，对比大模型实习、Agent 开发、搜推算法等岗位的一面 / 二面问题树，点“原帖”回溯公开来源。
+### 4. 结构化面经
 
 <p align="center">
   <a href="docs/screenshots/hd/05-experiences-meituan.png"><img src="docs/screenshots/hd/05-experiences-meituan.png" alt="按美团筛选的中文结构化面经" width="100%" /></a>
 </p>
 
-面经被拆成公司、岗位、轮次、结果和有序问题，不把英文公开题直接混入中文面试展示层；公司频率和追问素材可反向校准模拟面试。
+<p align="center"><sub>按公司、岗位与轮次组织问题，支持来源回溯</sub></p>
 
-### 5. 模拟面试：先深挖简历，再进入知识题
-
-**任务示例：** 合成候选人声称“负责评测数据集和指标设计”。面试官没有随机切到八股，而是继续追问：覆盖哪些场景、指标如何计算、从多少提升到多少。
+### 5. 个性化模拟面试
 
 <p align="center">
   <a href="docs/screenshots/hd/06-interview-deep-dive-voice.png"><img src="docs/screenshots/hd/06-interview-deep-dive-voice.png" alt="中文简历深挖、追问深度和面试官音色选择" width="100%" /></a>
 </p>
 
-- 中文场景默认中文表达，只保留必要技术术语；English interview 是显式选择，不由题库原文语言决定。
-- 七阶段状态机管理开场、自我介绍、项目深挖、知识八股、场景设计、反问和收尾，模型负责内容，Harness 负责边界。
-- 语音优先使用已配置的服务端真实 TTS；未配置时读取浏览器可用音色，按语言和自然度排序，并允许切换即试听。截图中使用 Windows 浏览器回退音色，Chrome / Edge / 其他 Chromium 环境会按各自 `speechSynthesis` 清单适配。
+<p align="center"><sub>中文场景、简历深挖、阶段化追问与跨浏览器音色适配</sub></p>
 
-### 6. 项目拷打：问题必须能回到真实代码
-
-**任务示例：** 面试官先浏览真实仓库并选择值得深挖的模块，再针对组卷接口里“LLM 只从候选池选 ID、服务端执行越池硬校验”的设计决策发问；右侧可回看完整思考轨迹，并直接打开对应源码。
+### 6. 代码证据驱动的项目拷打
 
 <p align="center">
   <a href="docs/screenshots/hd/07-grill-repo-evidence.png"><img src="docs/screenshots/hd/07-grill-repo-evidence.png" alt="G1 v2 项目拷打、推理过程与仓库证据" width="100%" /></a>
 </p>
 
-<p align="center"><sub>先读项目结构和关键文件，再把工具调用依据收敛成一个可回答的架构问题</sub></p>
+<p align="center"><sub>基于仓库结构与关键文件生成可核验的架构问题</sub></p>
 
 <p align="center">
   <a href="docs/screenshots/hd/08-repository-code-evidence.png"><img src="docs/screenshots/hd/08-repository-code-evidence.png" alt="项目拷打问题与源码内容对照" width="100%" /></a>
 </p>
 
-<p align="center"><sub>点击证据文件，现场回到源码内容与行号</sub></p>
-
-G1 v2 将项目理解拆成四个可独立替换的能力：
+<p align="center"><sub>问题、证据文件与源码行号直接关联</sub></p>
 
 | 能力 | 实现 | 失败时的行为 |
 |---|---|---|
@@ -119,31 +102,27 @@ G1 v2 将项目理解拆成四个可独立替换的能力：
 | 贡献核验 | 只读 Git 历史、贡献者与候选人归属摘要 | 非 Git / shallow 状态显式标注，不把提交量当能力结论 |
 | 现场查证 | `list_files` / `read_file` / `search_code` + `文件:行号` | 只读、限根目录、限返回预算 |
 
-### 7. 简历工作台：匹配结论必须有简历证据
-
-**任务示例：** 用合成简历匹配一个“企业级 RAG + Agent”岗位。系统给出 88/100，并分开列出已覆盖能力、上线经验缺口、加分项和可执行修改建议。
+### 7. 简历与岗位匹配
 
 <p align="center">
   <a href="docs/screenshots/hd/09-resume-jd-synthetic.png"><img src="docs/screenshots/hd/09-resume-jd-synthetic.png" alt="安全演示模式下的合成简历与 JD 匹配" width="100%" /></a>
 </p>
 
-截图中的姓名、简历、公司、项目、指标和 JD 均为合成数据。`?showcase=1` 会过滤其他简历记录，README 生成过程不会读取或显示真实候选人信息。
+<p align="center"><sub>基于简历证据识别匹配项、能力缺口与修改建议</sub></p>
 
-### 8. 评分与复习：一次失分变成下一次训练
-
-**任务示例：** 对上面的合成面试生成证据链报告，逐项评估理解深度、设计决策、表达、量化口径和诚实度；失分点随后进入 SM-2 队列。
+### 8. 评分与复习闭环
 
 <p align="center">
   <a href="docs/screenshots/hd/11-evidence-report-synthetic.png"><img src="docs/screenshots/hd/11-evidence-report-synthetic.png" alt="合成面试的证据链评分报告" width="100%" /></a>
 </p>
 
-<p align="center"><sub>评分项 → 原话证据 → 具体失分点 → 复习建议</sub></p>
+<p align="center"><sub>评分维度、原话证据、失分项与改进建议</sub></p>
 
 <p align="center">
   <a href="docs/screenshots/hd/10-review-sm2-synthetic.png"><img src="docs/screenshots/hd/10-review-sm2-synthetic.png" alt="合成失分点的 SM-2 复习队列" width="100%" /></a>
 </p>
 
-<p align="center"><sub>忘了 / 模糊 / 掌握了，支持掌握度统计与 Anki 导出</sub></p>
+<p align="center"><sub>SM-2 复习、掌握度统计与 Anki 导出</sub></p>
 
 ## 工程边界
 
@@ -156,11 +135,9 @@ apps/
 scripts/    Windows 一键安装、启动、停止、状态与日志
 ```
 
-核心原则是：**窄契约、显式失败、append-only 会话、幂等管道、可定位证据、本地数据不进 Git**。设计 Spec、调研记录、验收过程稿和个人求职材料仅在本地维护，不作为公开仓库内容发布。
+核心原则：**窄契约、显式失败、append-only 会话、幂等管道、可定位证据、本地数据不进 Git**。
 
 ## 验收基线
-
-最近一次完整验收：
 
 - API：121 tests + Ruff；Agents：29 tests + typecheck；Web：5 tests + typecheck + production build。
 - Tree-sitter：177/177 个受支持源码文件解析成功，370 个语法代码块，repo map 3,004 条引用边。
@@ -168,9 +145,9 @@ scripts/    Windows 一键安装、启动、停止、状态与日志
 - Git：公共 `itsdangerous` 仓库 15/15 个受支持源码解析，200 条提交历史完成归属分析。
 - 三项服务健康检查均为 200。
 
-机器可读证据：[G1 验收基线](apps/api/evals/g1-repository-intelligence-baseline.json)。设计与验收过程文档默认只保留在本地。
+机器可读证据：[G1 验收基线](apps/api/evals/g1-repository-intelligence-baseline.json)。
 
-> 当前唯一保留的发布环境门：配置真实 embedding Provider 后，用自然语言查询完成 Top-5 质量验收。没有 Provider 时功能会明确标记 unavailable，不静默降级成伪语义搜索。
+> 发布前需配置真实 embedding Provider，并完成自然语言 Top-5 检索质量验收；未配置时该能力明确标记为 unavailable。
 
 ## 快速开始
 
@@ -244,7 +221,7 @@ uv run python scripts/backfill_company_freq.py
 - [x] G1 v2：Tree-sitter repo map、pgvector 检索链路、Git 归属分析与动态能力注册
 - [x] L1：SM-2、掌握度、Anki、JD 匹配
 - [x] F7：五条学习路径、资源锚点、订阅与节点进度
-- [x] README v3：全量 3840px 无损截图、单图全宽、合成数据安全模式、内部文档本地化
+- [x] 产品文档与合成数据演示资产
 - [ ] 发布环境门：真实 embedding Provider 自然语言 Top-5 质量验收
 
 ## 复用与致谢
