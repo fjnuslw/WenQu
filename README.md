@@ -11,10 +11,10 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-35c790" alt="MIT License" /></a>
-  <a href="docs/spec.md"><img src="https://img.shields.io/badge/status-local_MVP_ready-6d63ff" alt="Local MVP ready" /></a>
+  <img src="https://img.shields.io/badge/status-local_MVP_ready-6d63ff" alt="Local MVP ready" />
   <a href="apps/api/pyproject.toml"><img src="https://img.shields.io/badge/Python-%E2%89%A53.12-3776ab" alt="Python 3.12+" /></a>
   <a href="apps/web/package.json"><img src="https://img.shields.io/badge/Node.js-%E2%89%A522-339933" alt="Node.js 22+" /></a>
-  <a href="docs/improvement-specs/IMP-G1-001-repository-intelligence-v2.md"><img src="https://img.shields.io/badge/repo_intelligence-v2-46c7f2" alt="Repository Intelligence v2" /></a>
+  <a href="apps/api/evals/g1-repository-intelligence-baseline.json"><img src="https://img.shields.io/badge/repo_intelligence-v2-46c7f2" alt="Repository Intelligence v2" /></a>
 </p>
 
 ## 为什么做问渠
@@ -34,14 +34,14 @@
 
 ## 当前版本：真实任务演示
 
-下列图片均在 **2026-09-02** 使用当前生产构建重新操作并截取，统一为 1440×900 暗色界面；不复用旧图。简历与复习模块启用了 `?showcase=1`，只显示仓库生成的合成候选人、合成 JD 和合成失分卡。
+下列图片均在 **2026-09-03** 使用当前生产构建重新操作并截取，以 1920 CSS 视口和 2× 设备像素比直接渲染为 **3840×2136 无损 PNG**；不放大旧图，也不复用旧界面。每张图单独全宽展示，点击图片可查看原始分辨率。简历与复习模块启用了 `?showcase=1`，只显示仓库生成的合成候选人、合成 JD 和合成失分卡。
 
 ### 1. 工作台：先知道今天该做什么
 
 **任务示例：** 打开平台后同时确认题库规模、面经覆盖、今日复习量与五条学习路径，再从一个明确入口开始训练。
 
 <p align="center">
-  <img src="docs/screenshots/v2/01-dashboard.png" alt="问渠工作台：题库、面经、复习和学习路径总览" width="100%" />
+  <a href="docs/screenshots/hd/01-dashboard.png"><img src="docs/screenshots/hd/01-dashboard.png" alt="问渠工作台：题库、面经、复习和学习路径总览" width="100%" /></a>
 </p>
 
 工作台不是导航页拼盘：它汇总题库与面经统计、SM-2 到期状态和路径进度，把“现在该做什么”放在首屏。
@@ -51,7 +51,7 @@
 **任务示例：** 完成“大模型应用 / 调用与提示”的第一个节点——对 5 组输入统计 token、首字延迟、总耗时和费用，并用 3 组 temperature 做对照实验。
 
 <p align="center">
-  <img src="docs/screenshots/v2/02-learning-task.png" alt="大模型应用学习路径中的具体任务、资源锚点和验收判据" width="100%" />
+  <a href="docs/screenshots/hd/02-learning-task.png"><img src="docs/screenshots/hd/02-learning-task.png" alt="大模型应用学习路径中的具体任务、资源锚点和验收判据" width="100%" /></a>
 </p>
 
 五条路径共 109 个节点、141 个已核验资源；节点包含目的、预计工时、产出物、逐项验收和可直达题库的考点标签，而不是一份链接收藏夹。
@@ -60,23 +60,24 @@
 
 **任务示例：** 用 `RAG` 标签从 22,812 道题中筛出 2,521 道，再进入“问助手”，获得面试口头版、原理展开、公式、易错点和可能追问。
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/v2/03-question-bank-rag.png" alt="RAG 题库筛选结果" /></td>
-    <td width="50%"><img src="docs/screenshots/v2/03b-question-assistant.png" alt="题库 AI 解答助手" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>厂商 / 岗位 / 题型 / 标签联合筛选，保留来源</sub></td>
-    <td align="center"><sub>口头版 → 原理 → 公式 → 追问，不只给标准答案</sub></td>
-  </tr>
-</table>
+<p align="center">
+  <a href="docs/screenshots/hd/03-question-bank-rag.png"><img src="docs/screenshots/hd/03-question-bank-rag.png" alt="RAG 题库筛选结果" width="100%" /></a>
+</p>
+
+<p align="center"><sub>厂商 / 岗位 / 题型 / 标签联合筛选，保留来源</sub></p>
+
+<p align="center">
+  <a href="docs/screenshots/hd/04-question-assistant.png"><img src="docs/screenshots/hd/04-question-assistant.png" alt="题库 AI 解答助手" width="100%" /></a>
+</p>
+
+<p align="center"><sub>口头版 → 原理 → 公式 → 追问，不只给标准答案</sub></p>
 
 ### 4. 结构化面经：看真实轮次如何追问项目
 
 **任务示例：** 筛选“美团”，对比大模型实习、Agent 开发、搜推算法等岗位的一面 / 二面问题树，点“原帖”回溯公开来源。
 
 <p align="center">
-  <img src="docs/screenshots/v2/04-experiences-meituan.png" alt="按美团筛选的中文结构化面经" width="100%" />
+  <a href="docs/screenshots/hd/05-experiences-meituan.png"><img src="docs/screenshots/hd/05-experiences-meituan.png" alt="按美团筛选的中文结构化面经" width="100%" /></a>
 </p>
 
 面经被拆成公司、岗位、轮次、结果和有序问题，不把英文公开题直接混入中文面试展示层；公司频率和追问素材可反向校准模拟面试。
@@ -86,7 +87,7 @@
 **任务示例：** 合成候选人声称“负责评测数据集和指标设计”。面试官没有随机切到八股，而是继续追问：覆盖哪些场景、指标如何计算、从多少提升到多少。
 
 <p align="center">
-  <img src="docs/screenshots/v2/05-interview-deep-dive-voice.png" alt="中文简历深挖、追问深度和面试官音色选择" width="100%" />
+  <a href="docs/screenshots/hd/06-interview-deep-dive-voice.png"><img src="docs/screenshots/hd/06-interview-deep-dive-voice.png" alt="中文简历深挖、追问深度和面试官音色选择" width="100%" /></a>
 </p>
 
 - 中文场景默认中文表达，只保留必要技术术语；English interview 是显式选择，不由题库原文语言决定。
@@ -95,18 +96,19 @@
 
 ### 6. 项目拷打：问题必须能回到真实代码
 
-**任务示例：** 面试官发现 `prep.py:121-129` 用经验权重决定备课文件优先级，于是追问“为什么 README 权重更高、如何验证、冷门关键文件能否兜住”；右侧同时打开仓库树和对应源码。
+**任务示例：** 面试官先浏览真实仓库并选择值得深挖的模块，再针对组卷接口里“LLM 只从候选池选 ID、服务端执行越池硬校验”的设计决策发问；右侧可回看完整思考轨迹，并直接打开对应源码。
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/v2/06-grill-repo-evidence.png" alt="项目拷打与源码树" /></td>
-    <td width="50%"><img src="docs/screenshots/v2/07-repository-intelligence-evidence.png" alt="项目拷打问题与源码内容对照" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>架构决策问题 + 可展开的真实文件树</sub></td>
-    <td align="center"><sub>点击证据锚点，现场回到对应文件内容</sub></td>
-  </tr>
-</table>
+<p align="center">
+  <a href="docs/screenshots/hd/07-grill-repo-evidence.png"><img src="docs/screenshots/hd/07-grill-repo-evidence.png" alt="G1 v2 项目拷打、推理过程与仓库证据" width="100%" /></a>
+</p>
+
+<p align="center"><sub>先读项目结构和关键文件，再把工具调用依据收敛成一个可回答的架构问题</sub></p>
+
+<p align="center">
+  <a href="docs/screenshots/hd/08-repository-code-evidence.png"><img src="docs/screenshots/hd/08-repository-code-evidence.png" alt="项目拷打问题与源码内容对照" width="100%" /></a>
+</p>
+
+<p align="center"><sub>点击证据文件，现场回到源码内容与行号</sub></p>
 
 G1 v2 将项目理解拆成四个可独立替换的能力：
 
@@ -122,7 +124,7 @@ G1 v2 将项目理解拆成四个可独立替换的能力：
 **任务示例：** 用合成简历匹配一个“企业级 RAG + Agent”岗位。系统给出 88/100，并分开列出已覆盖能力、上线经验缺口、加分项和可执行修改建议。
 
 <p align="center">
-  <img src="docs/screenshots/v2/08-resume-jd-synthetic.png" alt="安全演示模式下的合成简历与 JD 匹配" width="100%" />
+  <a href="docs/screenshots/hd/09-resume-jd-synthetic.png"><img src="docs/screenshots/hd/09-resume-jd-synthetic.png" alt="安全演示模式下的合成简历与 JD 匹配" width="100%" /></a>
 </p>
 
 截图中的姓名、简历、公司、项目、指标和 JD 均为合成数据。`?showcase=1` 会过滤其他简历记录，README 生成过程不会读取或显示真实候选人信息。
@@ -131,16 +133,17 @@ G1 v2 将项目理解拆成四个可独立替换的能力：
 
 **任务示例：** 对上面的合成面试生成证据链报告，逐项评估理解深度、设计决策、表达、量化口径和诚实度；失分点随后进入 SM-2 队列。
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/v2/10-evidence-report-synthetic.png" alt="合成面试的证据链评分报告" /></td>
-    <td width="50%"><img src="docs/screenshots/v2/09-review-sm2-synthetic.png" alt="合成失分点的 SM-2 复习队列" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>评分项 → 原话证据 → 具体失分点 → 复习建议</sub></td>
-    <td align="center"><sub>忘了 / 模糊 / 掌握了，支持掌握度统计与 Anki 导出</sub></td>
-  </tr>
-</table>
+<p align="center">
+  <a href="docs/screenshots/hd/11-evidence-report-synthetic.png"><img src="docs/screenshots/hd/11-evidence-report-synthetic.png" alt="合成面试的证据链评分报告" width="100%" /></a>
+</p>
+
+<p align="center"><sub>评分项 → 原话证据 → 具体失分点 → 复习建议</sub></p>
+
+<p align="center">
+  <a href="docs/screenshots/hd/10-review-sm2-synthetic.png"><img src="docs/screenshots/hd/10-review-sm2-synthetic.png" alt="合成失分点的 SM-2 复习队列" width="100%" /></a>
+</p>
+
+<p align="center"><sub>忘了 / 模糊 / 掌握了，支持掌握度统计与 Anki 导出</sub></p>
 
 ## 工程边界
 
@@ -150,12 +153,10 @@ apps/
   agents/   Node + pi：mock / grill / answer 三类 Agent、Harness、SSE 会话与只读工具
   web/      Next.js：八个可独立进入的产品模块与浏览器语音适配
 
-docs/       总规范、改进型 Spec、验收基线、README 视觉与截图规范
-research/   数据渠道、开源面试 Agent、DeepSeek Harness 与仓库理解调研
 scripts/    Windows 一键安装、启动、停止、状态与日志
 ```
 
-核心原则是：**窄契约、显式失败、append-only 会话、幂等管道、可定位证据、本地数据不进 Git**。详细设计见 [总规范](docs/spec.md) 与 [改进型 Spec 索引](docs/improvement-specs/README.md)。
+核心原则是：**窄契约、显式失败、append-only 会话、幂等管道、可定位证据、本地数据不进 Git**。设计 Spec、调研记录、验收过程稿和个人求职材料仅在本地维护，不作为公开仓库内容发布。
 
 ## 验收基线
 
@@ -167,7 +168,7 @@ scripts/    Windows 一键安装、启动、停止、状态与日志
 - Git：公共 `itsdangerous` 仓库 15/15 个受支持源码解析，200 条提交历史完成归属分析。
 - 三项服务健康检查均为 200。
 
-详细证据：[G1 验收基线](apps/api/evals/g1-repository-intelligence-baseline.json) · [G1 v2 Spec](docs/improvement-specs/IMP-G1-001-repository-intelligence-v2.md) · [F3 面试与语音 Spec](docs/improvement-specs/IMP-F3-002-grounded-chinese-interview-and-voice.md)
+机器可读证据：[G1 验收基线](apps/api/evals/g1-repository-intelligence-baseline.json)。设计与验收过程文档默认只保留在本地。
 
 > 当前唯一保留的发布环境门：配置真实 embedding Provider 后，用自然语言查询完成 Top-5 质量验收。没有 Provider 时功能会明确标记 unavailable，不静默降级成伪语义搜索。
 
@@ -243,7 +244,7 @@ uv run python scripts/backfill_company_freq.py
 - [x] G1 v2：Tree-sitter repo map、pgvector 检索链路、Git 归属分析与动态能力注册
 - [x] L1：SM-2、掌握度、Anki、JD 匹配
 - [x] F7：五条学习路径、资源锚点、订阅与节点进度
-- [x] README v2：全量新截图、合成数据安全模式、品牌封面与能力闭环图
+- [x] README v3：全量 3840px 无损截图、单图全宽、合成数据安全模式、内部文档本地化
 - [ ] 发布环境门：真实 embedding Provider 自然语言 Top-5 质量验收
 
 ## 复用与致谢

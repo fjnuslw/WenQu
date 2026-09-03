@@ -1,8 +1,8 @@
-"""G1 项目拷打：备课流水线（research/06 §3）。
+"""G1 项目拷打：备课流水线。
 
 本地目录 / zip / 公共 HTTPS Git → 噪声过滤 → 文件树+重要度 → LLM 分批备课
 （模块/职责/技术点/三类拷打题）→（可选）简历声明对照 → 注水疑点清单。
-产物落 Project + RepoArtifact（分步 checkpoint，spec §7）。
+产物落 Project + RepoArtifact（分步 checkpoint）。
 """
 
 import asyncio
@@ -26,7 +26,7 @@ from getoffer.grill.syntax import analyze_files
 from getoffer.llm.gateway import LLMGateway
 from getoffer.models import Project, RepoArtifact, Resume, ResumeClaim
 
-# 噪声过滤（gitingest/repomix 思路，research/03 §3.1）：目录名/扩展名/大小三道闸
+# 噪声过滤（gitingest/repomix 思路）：目录名/扩展名/大小三道闸
 EXCLUDE_DIRS = {
     ".git", ".hg", ".svn", "node_modules", ".venv", "venv", "__pycache__",
     "dist", "build", "out", "target", ".next", ".turbo", "coverage",

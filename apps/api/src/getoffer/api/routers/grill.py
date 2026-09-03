@@ -1,4 +1,4 @@
-"""项目拷打 API（G1，spec F4 / research/06）：备课触发与查询。"""
+"""项目拷打 API（G1）：备课触发与查询。"""
 
 import os
 from pathlib import Path, PurePosixPath

@@ -1,4 +1,4 @@
-"""摄入源注册表：license 门禁的代码级强制（spec §3 / research/02 §5）。
+"""摄入源注册表：license 门禁的代码级强制。
 
 allowed_use 含义：
 - ANSWERS       可作为答案底稿（MIT/Apache），入库时保留来源署名
@@ -34,7 +34,7 @@ class SourceSpec:
 
 def _build_sources() -> dict[str, SourceSpec]:
     entries: list[SourceSpec] = [
-        # --- MIT / Apache：答案底稿（research/02 §1.1/§1.2） ---
+        # --- MIT / Apache：答案底稿 ---
         SourceSpec(
             slug="faq-of-llm-interview",
             name="FAQ_Of_LLM_Interview",

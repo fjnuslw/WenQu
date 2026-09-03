@@ -1,6 +1,6 @@
 # get_offer agents — 面试/拷打 agent 运行时
 
-基于 **pi 生态**（MIT）的面试 agent 服务。spec：`docs/spec.md` §2/§5.2。
+基于 **pi 生态**（MIT）的面试 agent 服务，负责 mock / grill / answer 三类会话编排。
 
 ## 代码归属（复用 vs 自研）
 
@@ -40,4 +40,4 @@ F3 题单面试从 `self_intro` 开始，随后严格按题单题型投影到
 `project / knowledge / scenario`，题单耗尽进入 `closing`；当前 target、题号与追问深度
 均由 `src/interview/state-machine.ts` 管理。F4/answer 的 legacy 阶段状态机仍独立保留。
 Phase G1 的拷打模式（只读工具面 + repo 检索工具）在此服务上扩展，工具经
-`API_BASE_URL` 调 apps/api 的内部端点（见 spec §5.1）。
+`API_BASE_URL` 指向 apps/api 的内部端点。

@@ -13,7 +13,7 @@ import httpx
 
 from getoffer.errors import ComplianceViolation, UpstreamError
 
-# 真实浏览器 UA（research/02 §2.1：低频 + 真实 UA + 只抓公开页）
+# 真实浏览器 UA：低频访问且只抓公开页
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"

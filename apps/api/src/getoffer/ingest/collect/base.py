@@ -1,4 +1,4 @@
-"""面经采集渠道的公共类型（F1 后半，spec §3 / research/02 §2）。"""
+"""面经采集渠道的公共类型（F1 后半）。"""
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass

@@ -36,3 +36,9 @@ Thumbs.db
 
 # AI 助手工作记忆（本地会话日志，不随仓库公开）
 .workbuddy/
+
+# 内部设计与调研工件（含个人求职材料，仅在本地维护）
+/docs/**/*.md
+/research/
+/search/
+/apps/web/public/readme-architecture.html

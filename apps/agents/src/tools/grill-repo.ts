@@ -1,5 +1,5 @@
 /**
- * 项目拷打只读工具面（G1，research/06 §5）：
+ * 项目拷打只读工具面（G1）：
  * 本地基础工具 + API 能力工具——刻意排除 write/bash（拷打官只能读不能改）。
  * 路径监狱：所有读取 resolve 后必须仍在项目根内；单文件读取上限 64KB。
  * execute 签名：(toolCallId, params, ...)——pi-agent-core 契约（web-search 踩坑后固化）。

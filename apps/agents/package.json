@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "get_offer 面试/拷打 agent 运行时（基于 pi 生态，spec §2.1）",
+  "description": "get_offer 面试/拷打 agent 运行时（基于 pi 生态）",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
