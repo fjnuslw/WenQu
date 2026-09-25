@@ -39,6 +39,7 @@ Thumbs.db
 
 # 内部设计与调研工件（含个人求职材料，仅在本地维护）
 /docs/**/*.md
+!/docs/REPOSOCRATIC.md
 /research/
 /search/
 /apps/web/public/readme-architecture.html

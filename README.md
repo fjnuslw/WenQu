@@ -25,6 +25,20 @@
 - 代码、原话与评分结论均可定位、可核验。
 - Knowledge、Resume、Interview、Repository、Review 模块通过窄契约协作，可独立替换与优化。
 
+## 配套模型与后训练：RepoSocratic
+
+问渠的项目面试场景对应一个独立的模型训练项目：[**RepoSocratic**](https://github.com/fjnuslw/RepoSocratic)。
+
+| 组成 | 职责 | 入口 |
+|---|---|---|
+| **WenQu 应用** | 简历与岗位分析、面试会话、源码证据、语音及复习 | 本仓库 |
+| **RepoSocratic 训练与工具框架** | 27B→9B 轨迹/概率蒸馏、在线 GRPO、项目提问评测 | [训练源码](https://github.com/fjnuslw/RepoSocratic) |
+| **RepoSocratic Interviewer 权重** | K2 蒸馏版与 RL-73 版 LoRA | [Hugging Face](https://huggingface.co/xiongsir1/reposocratic-interviewer) |
+
+RepoSocratic 已完成 20 项目 / 100 场景的数据构造、73 组在线 GRPO 与 24 个训练外项目家族的统一评测。WenQu 展示应用工程，RepoSocratic 展示模型后训练，完整方法与数值见对应仓库。
+
+当前两个项目独立运行；WenQu 的面试仍使用现有 Provider。下一步以结构化项目题单接入 9B 异步备课服务，保持题干与私有面试依据分离。见 [联动设计与真实接入位置](docs/REPOSOCRATIC.md)。
+
 ## 能力架构
 
 <p align="center">
@@ -222,6 +236,8 @@ uv run python scripts/backfill_company_freq.py
 - [x] L1：SM-2、掌握度、Anki、JD 匹配
 - [x] F7：五条学习路径、资源锚点、订阅与节点进度
 - [x] 产品文档与合成数据演示资产
+- [x] RepoSocratic 配套训练源码与 LoRA 权重发布入口
+- [ ] RepoSocratic 9B 异步备课服务与项目题单接入
 - [ ] 发布环境门：真实 embedding Provider 自然语言 Top-5 质量验收
 
 ## 复用与致谢
